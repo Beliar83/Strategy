@@ -1,5 +1,4 @@
 mod position {
-    use gdnative::prelude::*;
 
     /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
     pub struct Position {
@@ -10,7 +9,6 @@ mod position {
 
     impl Position {
         /// Creates a position from axial coordinates
-        ///
         pub fn new_axial(q: i32, r: i32) -> Self {
             // https://www.redblobgames.com/grids/hexagons/#conversions-axial
             Position { q, r, s: -q - r }
@@ -21,12 +19,13 @@ mod position {
             Position { q, r, s }
         }
 
-        /// Calculates if another position is a neighbour
-        pub fn is_neighbour(&self, other: &Position) -> bool {
+        pub fn distance_to(&self, other: &Position) -> i32 {
             // https://www.redblobgames.com/grids/hexagons/#distances-cube
-            // TODO: Refactor formula to a tested distance method
-            (((self.q - other.q).abs() + (self.r - other.r).abs() + (self.s - other.s).abs()) / 2)
-                == 1
+            ((self.q - other.q).abs() + (self.r - other.r).abs() + (self.s - other.s).abs()) / 2
+        }
+
+        pub fn is_neighbour(&self, other: &Position) -> bool {
+            self.distance_to(&other) == 1
         }
     }
 
@@ -114,6 +113,33 @@ mod position {
             non_neighbour_16 : Position::new_axial(0, 0),
             non_neighbour_17 : Position::new_axial(10, -1),
             non_neighbour_18 : Position::new_axial(-5, -1),
+        }
+
+        macro_rules! distance_to_returns_correct_distance {
+            ($($name:ident: $value:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (first, second, expected) = $value;
+                    assert_eq!(expected, first.distance_to(&second));
+                }
+            )*
+            }
+        }
+
+        distance_to_returns_correct_distance! {
+            distance_0: (Position::new_axial(0, 0), Position::new_axial(0, 0), 0),
+            distance_1: (Position::new_axial(0, 0), Position::new_axial(1, 0), 1),
+            distance_2: (Position::new_axial(0, 0), Position::new_axial(2, 0), 2),
+            distance_3: (Position::new_axial(0, 0), Position::new_axial(5, 4), 9),
+            distance_4: (Position::new_axial(0, 0), Position::new_axial(1, -5), 5),
+            distance_5: (Position::new_axial(0, 0), Position::new_axial(-15, -5), 20),
+            distance_6: (Position::new_axial(0, 0), Position::new_axial(30, -5), 30),
+            distance_7: (Position::new_axial(1, 0), Position::new_axial(0, 0), 1),
+            distance_8: (Position::new_axial(1, 0), Position::new_axial(5, 4), 8),
+            distance_9: (Position::new_axial(1, 4), Position::new_axial(20, 9), 24),
+            distance_10: (Position::new_axial(20, 3), Position::new_axial(-5, 4), 25),
+            distance_11: (Position::new_axial(-9, 13), Position::new_axial(6, 31), 33),
         }
     }
 }
