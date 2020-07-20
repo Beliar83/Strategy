@@ -1,0 +1,18 @@
+[gd_scene format=2]
+
+[node name="Node2D" type="Node2D"]
+
+[node name="Polygon2D3" type="Polygon2D" parent="."]
+position = Vector2( 1.75, -0.0078125 )
+rotation = 1.5708
+color = Color( 0, 0, 0, 1 )
+offset = Vector2( 0, 0.5 )
+invert_border = 0.1
+polygon = PoolVector2Array( 0.5, -0.5, -2.38419e-06, 0.375, 0.5, 1.25, 1.5, 1.25, 2, 0.375, 1.5, -0.5 )
+
+[node name="Polygon2D2" type="Polygon2D" parent="Polygon2D3"]
+position = Vector2( 0.1, 0.1 )
+scale = Vector2( 0.9, 0.9 )
+offset = Vector2( 0, 0.5 )
+invert_border = 14361.3
+polygon = PoolVector2Array( 0.5, -0.5, -2.38419e-06, 0.375, 0.5, 1.25, 1.5, 1.25, 2, 0.375, 1.5, -0.5 )
