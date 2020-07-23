@@ -3,6 +3,7 @@ use gdnative::prelude::*;
 mod components;
 mod gameworld;
 mod hexfield;
+mod systems;
 
 // Function that registers all exposed classes to Godot
 fn init(handle: InitHandle) {

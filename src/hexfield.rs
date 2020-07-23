@@ -1,4 +1,4 @@
-use crate::components::position::Position;
+use crate::components::hexagon::Hexagon;
 use gdnative::api::{Area2D, Polygon2D};
 use gdnative::prelude::*;
 
@@ -6,7 +6,7 @@ use gdnative::prelude::*;
 #[inherit(Area2D)]
 #[register_with(Self::register_properties)]
 pub struct HexField {
-    pub hex_position: Position,
+    pub hexagon: Hexagon,
     northwest: Option<Box<HexField>>,
     northeast: Option<Box<HexField>>,
     east: Option<Box<HexField>>,
@@ -19,7 +19,7 @@ pub struct HexField {
 impl HexField {
     pub fn new(_owner: &Area2D) -> Self {
         HexField {
-            hex_position: Position::zero(),
+            hexagon: Hexagon::zero(),
             northwest: None,
             northeast: None,
             east: None,
@@ -55,19 +55,19 @@ impl HexField {
 
     fn register_properties(builder: &ClassBuilder<Self>) {
         builder
-            .add_property("hex_position/q")
-            .with_getter(|instance, _| instance.hex_position.q)
-            .with_setter(|instance, _, value| instance.hex_position.q = value)
+            .add_property("hexagon/q")
+            .with_getter(|instance, _| instance.hexagon.q)
+            .with_setter(|instance, _, value| instance.hexagon.q = value)
             .done();
         builder
-            .add_property("hex_position/r")
-            .with_getter(|instance, _| instance.hex_position.r)
-            .with_setter(|instance, _, value| instance.hex_position.r = value)
+            .add_property("hexagon/r")
+            .with_getter(|instance, _| instance.hexagon.r)
+            .with_setter(|instance, _, value| instance.hexagon.r = value)
             .done();
         builder
-            .add_property("hex_position/s")
-            .with_getter(|instance, _| instance.hex_position.s)
-            .with_setter(|instance, _, value| instance.hex_position.s = value)
+            .add_property("hexagon/s")
+            .with_getter(|instance, _| instance.hexagon.s)
+            .with_setter(|instance, _, value| instance.hexagon.s = value)
             .done();
     }
 }
