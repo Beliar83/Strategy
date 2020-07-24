@@ -23,7 +23,7 @@ impl Hexagon {
             q,
             r,
             s: -q - r,
-            size: size,
+            size,
         }
     }
 

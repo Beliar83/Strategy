@@ -1,4 +1,5 @@
-use super::{hexgrid::get_2d_position_from_hex, NodeComponent};
+use super::hexgrid::get_2d_position_from_hex;
+use crate::components::node_component::NodeComponent;
 use crate::components::{hexagon::Hexagon, node_template::NodeTemplate};
 use gdnative::prelude::*;
 use legion::prelude::*;
@@ -9,9 +10,7 @@ pub enum ManageErrs {
     RootClassNotSpatial(String),
 }
 
-pub fn create_and_delete_nodes(world: &mut World, root: &Node2D) {
-    // TODO: Delete nodes that no longer exist
-
+pub fn create_nodes(world: &mut World, root: &Node2D) {
     let mut relevant_entities = Vec::new();
 
     let iter = world.iter_entities();
@@ -46,7 +45,7 @@ pub fn create_and_delete_nodes(world: &mut World, root: &Node2D) {
                 }
                 drop(node_data);
                 root.add_child(node2d, false);
-                match world.add_component(entity, NodeComponent(node2d)) {
+                match world.add_component(entity, NodeComponent { node: node2d }) {
                     Ok(_) => {}
                     Err(_) => godot_print!("Could not add NodeComponent for created node"),
                 }
@@ -85,7 +84,7 @@ pub fn update_nodes() -> Box<dyn Runnable> {
             for (node, position) in query.iter_mut(world) {
                 unsafe {
                     let position = get_2d_position_from_hex(&position);
-                    node.0.assume_safe().set_position(position);
+                    node.node.assume_safe().set_position(position);
                 }
             }
         })

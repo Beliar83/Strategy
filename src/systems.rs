@@ -1,7 +1,9 @@
 pub mod dynamic_nodes;
 pub mod hexgrid;
 
-use dynamic_nodes::{create_and_delete_nodes, update_nodes};
+use crossbeam::channel::Receiver;
+use crossbeam::crossbeam_channel;
+use dynamic_nodes::{create_nodes, update_nodes};
 use gdnative::prelude::*;
 use lazy_static::lazy_static;
 use legion::prelude::*;
@@ -16,11 +18,6 @@ where
 {
     let _result = WORLD.try_lock().map(|mut world| f(&mut world));
 }
-
-pub struct NodeComponent(Ref<Node2D>);
-
-unsafe impl Send for NodeComponent {}
-unsafe impl Sync for NodeComponent {}
 
 pub struct Delta(pub f32);
 
@@ -47,7 +44,7 @@ impl Process {
             .map(|mut d| d.0 = delta as f32);
 
         with_world(|world| {
-            create_and_delete_nodes(world, root);
+            create_nodes(world, root);
         });
 
         with_world(|mut world| {
