@@ -1,9 +1,10 @@
 /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
+#[derive(Copy, Clone)]
 pub struct Hexagon {
-    pub q: i32,
-    pub r: i32,
-    pub s: i32,
-    pub size: i32,
+    q: i32,
+    r: i32,
+    s: i32,
+    size: i32,
 }
 
 impl Hexagon {
@@ -19,17 +20,50 @@ impl Hexagon {
     /// Creates a position from axial coordinates
     pub fn new_axial(q: i32, r: i32, size: i32) -> Self {
         // https://www.redblobgames.com/grids/hexagons/#conversions-axial
-        Hexagon {
-            q,
-            r,
-            s: -q - r,
-            size,
-        }
+        let mut hexagon = Hexagon { q, r, s: 0, size };
+        hexagon.update_s();
+        hexagon
+    }
+
+    fn update_s(&mut self) {
+        self.s = -self.r - self.q;
     }
 
     /// Creates a position from cube coordinates
     pub fn new_cube(q: i32, r: i32, s: i32, size: i32) -> Self {
         Hexagon { q, r, s, size }
+    }
+
+    pub fn get_q(&self) -> i32 {
+        self.q
+    }
+
+    pub fn get_r(&self) -> i32 {
+        self.r
+    }
+
+    pub fn get_s(&self) -> i32 {
+        self.s
+    }
+
+    pub fn get_size(&self) -> i32 {
+        self.size
+    }
+
+    pub fn set_size(&mut self, size: i32) {
+        self.size = size
+    }
+
+    pub fn set_axial(&mut self, q: i32, r: i32) {
+        self.q = q;
+        self.r = r;
+        self.update_s();
+    }
+
+    pub fn set_cube(&mut self, q: i32, r: i32, s: i32) {
+        self.q = q;
+        self.r = r;
+        self.s = s;
     }
 
     pub fn distance_to(&self, other: &Hexagon) -> i32 {
@@ -46,30 +80,59 @@ impl Hexagon {
 mod tests {
     use super::*;
 
-    macro_rules! s_was_calculated_correctly {
+    macro_rules! new_axial_calculates_s_correctly {
         ($($name:ident: $value:expr,)*) => {
         $(
             #[test]
             fn $name() {
-                let (input, expected) = $value;
+                let (q, r, expected) = $value;
+                let input = Hexagon::new_axial(q, r, 0);
                 assert_eq!(expected, input.s);
             }
         )*
         }
     }
 
-    s_was_calculated_correctly! {
-        s_0: (Hexagon::new_axial(0, 0, 0), 0),
-        s_1: (Hexagon::new_axial(1, 0, 0), -1),
-        s_2: (Hexagon::new_axial(1, 1, 0), -2),
-        s_3: (Hexagon::new_axial(0, 1, 0), -1),
-        s_4: (Hexagon::new_axial(-1, 0, 0), 1),
-        s_5: (Hexagon::new_axial(-1, -1, 0), 2),
-        s_6: (Hexagon::new_axial(0, -1, 0), 1),
-        s_7: (Hexagon::new_axial(5, -2, 0), -3),
-        s_8: (Hexagon::new_axial(2, -2, 0), 0),
-        s_9: (Hexagon::new_axial(-9, 5, 0), 4),
-        s_10: (Hexagon::new_axial(-9, -4, 0), 13),
+    new_axial_calculates_s_correctly! {
+        s_0: (0, 0, 0),
+        s_1: (1, 0, -1),
+        s_2: (1, 1, -2),
+        s_3: (0, 1, -1),
+        s_4: (-1, 0, 1),
+        s_5: (-1, -1, 2),
+        s_6: (0, -1, 1),
+        s_7: (5, -2, -3),
+        s_8: (2, -2, 0),
+        s_9: (-9, 5, 4),
+        s_10: (-9, -4, 13),
+    }
+
+    macro_rules! set_axial_calculates_s_correctly {
+        ($($name:ident: $value:expr,)*) => {
+        $(
+            #[test]
+            fn $name() {
+                let (q, r, expected) = $value;
+                let mut input = Hexagon::new_axial(0, 0, 0);
+                input.set_axial(q, r);
+                assert_eq!(expected, input.s);
+            }
+        )*
+        }
+    }
+
+    set_axial_calculates_s_correctly! {
+        set_s_0: (0, 0, 0),
+        set_s_1: (1, 0, -1),
+        set_s_2: (1, 1, -2),
+        set_s_3: (0, 1, -1),
+        set_s_4: (-1, 0, 1),
+        set_s_5: (-1, -1, 2),
+        set_s_6: (0, -1, 1),
+        set_s_7: (5, -2, -3),
+        set_s_8: (2, -2, 0),
+        set_s_9: (-9, 5, 4),
+        set_s_10: (-9, -4, 13),
     }
 
     macro_rules! is_neighbour_returns_true_for_neighbour_positions {

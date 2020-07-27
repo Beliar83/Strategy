@@ -1,12 +1,11 @@
-use crate::components::hexagon::Hexagon;
+use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::{Area2D, Polygon2D};
 use gdnative::prelude::*;
 
 #[derive(NativeClass)]
 #[inherit(Area2D)]
-#[register_with(Self::register_properties)]
+#[register_with(Self::register_signals)]
 pub struct HexField {
-    pub hexagon: Hexagon,
     northwest: Option<Box<HexField>>,
     northeast: Option<Box<HexField>>,
     east: Option<Box<HexField>>,
@@ -19,7 +18,6 @@ pub struct HexField {
 impl HexField {
     pub fn new(_owner: &Area2D) -> Self {
         HexField {
-            hexagon: Hexagon::zero(),
             northwest: None,
             northeast: None,
             east: None,
@@ -27,6 +25,13 @@ impl HexField {
             southwest: None,
             west: None,
         }
+    }
+
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: "hex_clicked",
+            args: &[],
+        });
     }
 
     #[export]
@@ -53,21 +58,28 @@ impl HexField {
         };
     }
 
-    fn register_properties(builder: &ClassBuilder<Self>) {
-        builder
-            .add_property("hexagon/q")
-            .with_getter(|instance, _| instance.hexagon.q)
-            .with_setter(|instance, _, value| instance.hexagon.q = value)
-            .done();
-        builder
-            .add_property("hexagon/r")
-            .with_getter(|instance, _| instance.hexagon.r)
-            .with_setter(|instance, _, value| instance.hexagon.r = value)
-            .done();
-        builder
-            .add_property("hexagon/s")
-            .with_getter(|instance, _| instance.hexagon.s)
-            .with_setter(|instance, _, value| instance.hexagon.s = value)
-            .done();
+    #[export]
+    fn _on_field_input_event(
+        &self,
+        owner: &Area2D,
+        _node: Variant,
+        event: Variant,
+        _shape_idx: i32,
+    ) {
+        let event = match event.try_to_object::<InputEventMouseButton>() {
+            None => {
+                return;
+            }
+            Some(event) => event,
+        };
+
+        if !unsafe { event.assume_safe() }.is_pressed() {
+            return;
+        }
+
+        owner.emit_signal(
+            "hex_clicked",
+            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+        );
     }
 }

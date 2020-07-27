@@ -39,12 +39,13 @@ pub fn create_nodes(world: &mut World, root: &Node2D) {
             Ok(node2d) => {
                 let node2d = node2d.into_shared();
                 unsafe {
-                    node2d
-                        .assume_safe()
-                        .set_scale(Vector2::new(node_data.scale_x, node_data.scale_y));
+                    let node2d = node2d.assume_safe_if_sane().unwrap();
+                    node2d.set_scale(Vector2::new(node_data.scale_x, node_data.scale_y));
+                    node2d.set_meta("Entity", entity.index());
                 }
                 drop(node_data);
                 root.add_child(node2d, false);
+
                 match world.add_component(entity, NodeComponent { node: node2d }) {
                     Ok(_) => {}
                     Err(_) => godot_print!("Could not add NodeComponent for created node"),

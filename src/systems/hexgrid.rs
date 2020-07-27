@@ -30,9 +30,9 @@ pub fn create_grid(radius: u32, prefab_path: String, field_size: i32) {
 }
 
 pub fn get_2d_position_from_hex(hex: &Hexagon) -> Vector2 {
-    let x =
-        hex.size as f32 * (3.0_f32.sqrt() * (hex.q as f32) + 3.0_f32.sqrt() / 2.0 * (hex.r as f32));
-    let y = hex.size as f32 * (3.0 / 2.0 * (hex.r as f32));
+    let x = hex.get_size() as f32
+        * (3.0_f32.sqrt() * (hex.get_q() as f32) + 3.0_f32.sqrt() / 2.0 * (hex.get_r() as f32));
+    let y = hex.get_size() as f32 * (3.0 / 2.0 * (hex.get_r() as f32));
     return Vector2::new(x, y);
 }
 
@@ -52,9 +52,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == 0
-                    && position_data.r == 0
-                    && position_data.s == 0
+                    && position_data.get_q() == 0
+                    && position_data.get_r() == 0
+                    && position_data.get_s() == 0
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -63,9 +63,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == 1
-                    && position_data.r == 0
-                    && position_data.s == -1
+                    && position_data.get_q() == 1
+                    && position_data.get_r() == 0
+                    && position_data.get_s() == -1
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -74,9 +74,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == 0
-                    && position_data.r == 1
-                    && position_data.s == -1
+                    && position_data.get_q() == 0
+                    && position_data.get_r() == 1
+                    && position_data.get_s() == -1
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -85,9 +85,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == 0
-                    && position_data.r == -1
-                    && position_data.s == 1
+                    && position_data.get_q() == 0
+                    && position_data.get_r() == -1
+                    && position_data.get_s() == 1
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -96,9 +96,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == -1
-                    && position_data.r == 0
-                    && position_data.s == 1
+                    && position_data.get_q() == -1
+                    && position_data.get_r() == 0
+                    && position_data.get_s() == 1
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -107,9 +107,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == -1
-                    && position_data.r == 1
-                    && position_data.s == 0
+                    && position_data.get_q() == -1
+                    && position_data.get_r() == 1
+                    && position_data.get_s() == 0
             });
             assert!(result);
             let result = world.iter_entities().any(|entity| {
@@ -118,9 +118,9 @@ mod tests {
                 node_data.scene_file == "test"
                     && node_data.scale_x == 2.0
                     && node_data.scale_y == 2.0
-                    && position_data.q == 1
-                    && position_data.r == -1
-                    && position_data.s == 0
+                    && position_data.get_q() == 1
+                    && position_data.get_r() == -1
+                    && position_data.get_s() == 0
             });
             assert!(result);
         })

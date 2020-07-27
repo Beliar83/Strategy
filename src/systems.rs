@@ -1,8 +1,5 @@
 pub mod dynamic_nodes;
 pub mod hexgrid;
-
-use crossbeam::channel::Receiver;
-use crossbeam::crossbeam_channel;
 use dynamic_nodes::{create_nodes, update_nodes};
 use gdnative::prelude::*;
 use lazy_static::lazy_static;

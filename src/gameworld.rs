@@ -1,4 +1,7 @@
+use crate::components::hexagon::Hexagon;
 use crate::components::node_component::NodeComponent;
+use crate::components::node_template::NodeTemplate;
+use crate::components::unit::{attack, Unit};
 use crate::systems::hexgrid::create_grid;
 use crate::systems::{with_world, Process};
 use crossbeam::channel::Receiver;
@@ -9,11 +12,11 @@ use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
-
 pub struct GameWorld {
     process: Process,
     event_receiver: Receiver<Event>,
     node_entity: HashMap<u32, Ref<Node2D>>,
+    selected_entity: Option<u32>,
 }
 
 #[methods]
@@ -27,12 +30,13 @@ impl GameWorld {
             process: Process::new(),
             event_receiver: receiver,
             node_entity: HashMap::new(),
+            selected_entity: None,
         }
     }
 
     #[export]
-    pub fn _process(&mut self, owner: &Node2D, delta: f64) {
-        self.process.execute(owner, delta);
+    pub fn _process(&mut self, owner: TRef<Node2D>, delta: f64) {
+        self.process.execute(&owner, delta);
         let mut added_entities = Vec::new();
         let mut removed_entities = Vec::new();
         for event in self.event_receiver.try_iter() {
@@ -46,6 +50,18 @@ impl GameWorld {
             with_world(|world| {
                 let node = world.get_component::<NodeComponent>(entity).unwrap();
                 self.node_entity.insert(entity.index(), node.node);
+                unsafe {
+                    node.node
+                        .assume_safe()
+                        .connect(
+                            "hex_clicked",
+                            owner,
+                            "hex_clicked",
+                            VariantArray::new_shared(),
+                            0,
+                        )
+                        .unwrap();
+                }
             });
         }
 
@@ -57,5 +73,131 @@ impl GameWorld {
     #[export]
     pub fn _ready(&mut self, _owner: &Node2D) {
         create_grid(4, "res://HexField.tscn".to_owned(), 20);
+        with_world(|world| {
+            world.insert(
+                (),
+                vec![(
+                    Hexagon::new_axial(0, 0, 20),
+                    NodeTemplate {
+                        scene_file: "res://DummyUnit.tscn".to_owned(),
+                        scale_x: 10.0,
+                        scale_y: 10.0,
+                    },
+                    Unit::new(10, 2, 1, 1),
+                )],
+            );
+            world.insert(
+                (),
+                vec![(
+                    Hexagon::new_axial(0, 1, 20),
+                    NodeTemplate {
+                        scene_file: "res://DummyUnit.tscn".to_owned(),
+                        scale_x: 10.0,
+                        scale_y: 10.0,
+                    },
+                    Unit::new(10, 2, 1, 1),
+                )],
+            );
+        })
+    }
+
+    #[export]
+    fn hex_clicked(&mut self, _owner: &Node2D, data: Variant) {
+        let entity_index = data.try_to_u64().unwrap() as u32;
+        with_world(|world| {
+            let query = <Read<Hexagon>>::query();
+
+            let mut found_entities = Vec::new();
+
+            let entity_of_node = world
+                .iter_entities()
+                .find(|entity| entity.index() == entity_index)
+                .unwrap();
+
+            let clicked_hexagon = *world
+                .get_component::<Hexagon>(entity_of_node)
+                .unwrap()
+                .clone();
+            for entity in query.iter_entities(world) {
+                let hexagon = world.get_component::<Hexagon>(entity.0).unwrap();
+                if hexagon.get_q() != clicked_hexagon.get_q()
+                    || hexagon.get_r() != clicked_hexagon.get_r()
+                {
+                    continue;
+                }
+                found_entities.push(entity.0);
+            }
+
+            if found_entities.len() == 0 {
+                return;
+            }
+
+            let mut found_entity = found_entities
+                .iter()
+                .find(|entity| world.has_component::<Unit>(**entity));
+
+            if found_entity == None {
+                found_entity = found_entities.iter().next();
+            }
+
+            let found_entity = match found_entity {
+                None => {
+                    return;
+                }
+                Some(entity) => entity,
+            };
+
+            match self.selected_entity {
+                None => {
+                    if !world.has_component::<Unit>(*found_entity) {
+                        return;
+                    }
+                    self.selected_entity = Some(found_entity.index());
+                    godot_print!("Selected entity {}", found_entity);
+                }
+                Some(selected_entity) => {
+                    let selected_entity = world
+                        .iter_entities()
+                        .find(|entity| entity.index() == selected_entity);
+                    match selected_entity {
+                        None => {}
+                        Some(selected_entity) => {
+                            if world.has_component::<Unit>(*found_entity) {
+                                if !world.has_component::<Unit>(selected_entity) {
+                                    return;
+                                }
+                                let selected_unit = *world
+                                    .get_component::<Unit>(selected_entity)
+                                    .unwrap()
+                                    .clone();
+                                let mut clicked_unit =
+                                    world.get_component_mut::<Unit>(*found_entity).unwrap();
+                                godot_print!(
+                                    "Attacking with {} against {} ({})",
+                                    selected_unit.damage,
+                                    clicked_unit.integrity,
+                                    clicked_unit.armor,
+                                );
+                                let result = attack(&selected_unit, &mut *clicked_unit);
+                                drop(clicked_unit);
+                                godot_print!("Damage dealt: {}", result.actual_damage);
+                                godot_print!("Remaining integrity: {}", result.remaining_integrity);
+                                if result.remaining_integrity <= 0 {
+                                    godot_print!("Target destroyed");
+                                    world.delete(*found_entity);
+                                }
+                                self.selected_entity = None;
+                            } else {
+                                let mut selected_hexagon =
+                                    world.get_component_mut::<Hexagon>(selected_entity).unwrap();
+                                selected_hexagon
+                                    .set_axial(clicked_hexagon.get_q(), clicked_hexagon.get_r());
+                                self.selected_entity = None;
+                            }
+                        }
+                    }
+                }
+            }
+        })
     }
 }
