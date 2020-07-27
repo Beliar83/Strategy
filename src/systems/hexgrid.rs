@@ -2,7 +2,7 @@ use super::with_world;
 use crate::components::{hexagon::Hexagon, node_template::NodeTemplate};
 use gdnative::prelude::*;
 
-pub fn create_grid(radius: u32, prefab_path: String, field_size: i32) {
+pub fn create_grid(radius: u32, prefab_path: String, field_size: i32, node_scale: f32) {
     let radius = radius as i32;
     with_world(|world| {
         for q in -radius..radius + 1 {
@@ -19,8 +19,8 @@ pub fn create_grid(radius: u32, prefab_path: String, field_size: i32) {
                         hex_position,
                         NodeTemplate {
                             scene_file: prefab_path.clone(),
-                            scale_x: field_size as f32,
-                            scale_y: field_size as f32,
+                            scale_x: node_scale,
+                            scale_y: node_scale,
                         },
                     )],
                 );
@@ -43,15 +43,15 @@ mod tests {
 
     #[test]
     fn create_grid_creates_grid_of_correct_size() {
-        create_grid(1, "test".to_owned(), 2);
+        create_grid(1, "test".to_owned(), 2, 1.5);
         with_world(|world| {
             assert_eq!(world.iter_entities().count(), 7);
             let result = world.iter_entities().any(|entity| {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == 0
                     && position_data.get_r() == 0
                     && position_data.get_s() == 0
@@ -61,8 +61,8 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == 1
                     && position_data.get_r() == 0
                     && position_data.get_s() == -1
@@ -72,8 +72,8 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == 0
                     && position_data.get_r() == 1
                     && position_data.get_s() == -1
@@ -83,8 +83,8 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == 0
                     && position_data.get_r() == -1
                     && position_data.get_s() == 1
@@ -94,8 +94,8 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == -1
                     && position_data.get_r() == 0
                     && position_data.get_s() == 1
@@ -105,8 +105,8 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == -1
                     && position_data.get_r() == 1
                     && position_data.get_s() == 0
@@ -116,13 +116,13 @@ mod tests {
                 let position_data = world.get_component::<Hexagon>(entity).unwrap();
                 let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
                 node_data.scene_file == "test"
-                    && node_data.scale_x == 2.0
-                    && node_data.scale_y == 2.0
+                    && node_data.scale_x == 1.5
+                    && node_data.scale_y == 1.5
                     && position_data.get_q() == 1
                     && position_data.get_r() == -1
                     && position_data.get_s() == 0
             });
             assert!(result);
-        })
+        });
     }
 }

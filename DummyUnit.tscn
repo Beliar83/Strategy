@@ -3,10 +3,10 @@
 [ext_resource path="res://unit.gdns" type="Script" id=1]
 
 [sub_resource type="QuadMesh" id=1]
-size = Vector2( 2, 2 )
+size = Vector2( 40, 40 )
 
 [sub_resource type="RectangleShape2D" id=2]
-extents = Vector2( 1, 1 )
+extents = Vector2( 20, 20 )
 
 [node name="Dummy" type="Area2D"]
 script = ExtResource( 1 )
@@ -16,11 +16,25 @@ modulate = Color( 1, 0, 0, 1 )
 mesh = SubResource( 1 )
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-visible = false
 shape = SubResource( 2 )
 
 [node name="Outline" type="Line2D" parent="."]
 visible = false
-points = PoolVector2Array( -1, -1, 1, -1, 1, 1, -1, 1, -1, -1 )
-width = 0.1
+points = PoolVector2Array( -20, -20, 20, -20, 20, 20, -20, 20, -20, -20 )
+width = 2.0
+default_color = Color( 0, 0, 0, 1 )
 begin_cap_mode = 1
+
+[node name="Integrity" type="Label" parent="."]
+margin_left = -11.5672
+margin_top = -6.44879
+margin_right = 12.4328
+margin_bottom = 7.55121
+text = "999"
+align = 1
+valign = 1
+clip_text = true
+max_lines_visible = 1
+__meta__ = {
+"_edit_use_anchors_": false
+}

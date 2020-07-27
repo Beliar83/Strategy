@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
+#[register_with(Self::register_signals)]
 pub struct GameWorld {
     process: Process,
     event_receiver: Receiver<Event>,
@@ -32,6 +33,26 @@ impl GameWorld {
             node_entity: HashMap::new(),
             selected_entity: None,
         }
+    }
+
+    fn set_selected_entity(&mut self, entity: Option<u32>, owner: TRef<Node2D>) {
+        self.selected_entity = entity;
+
+        match entity {
+            None => {
+                owner.emit_signal("entity_selected", &[Variant::new()]);
+            }
+            Some(entity) => {
+                owner.emit_signal("entity_selected", &[Variant::from_u64(entity as u64)]);
+            }
+        }
+    }
+
+    fn register_signals(builder: &ClassBuilder<Self>) {
+        builder.add_signal(Signal {
+            name: "entity_selected",
+            args: &[],
+        });
     }
 
     #[export]
@@ -72,16 +93,18 @@ impl GameWorld {
 
     #[export]
     pub fn _ready(&mut self, _owner: &Node2D) {
-        create_grid(4, "res://HexField.tscn".to_owned(), 20);
+        let size = 40;
+
+        create_grid(4, "res://HexField.tscn".to_owned(), size, 1.0);
         with_world(|world| {
             world.insert(
                 (),
                 vec![(
-                    Hexagon::new_axial(0, 0, 20),
+                    Hexagon::new_axial(0, 0, size),
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 10.0,
-                        scale_y: 10.0,
+                        scale_x: 1.0,
+                        scale_y: 1.0,
                     },
                     Unit::new(10, 2, 1, 1),
                 )],
@@ -89,20 +112,20 @@ impl GameWorld {
             world.insert(
                 (),
                 vec![(
-                    Hexagon::new_axial(0, 1, 20),
+                    Hexagon::new_axial(0, 1, size),
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 10.0,
-                        scale_y: 10.0,
+                        scale_x: 1.0,
+                        scale_y: 1.0,
                     },
                     Unit::new(10, 2, 1, 1),
                 )],
             );
-        })
+        });
     }
 
     #[export]
-    fn hex_clicked(&mut self, _owner: &Node2D, data: Variant) {
+    fn hex_clicked(&mut self, owner: TRef<Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_world(|world| {
             let query = <Read<Hexagon>>::query();
@@ -152,8 +175,7 @@ impl GameWorld {
                     if !world.has_component::<Unit>(*found_entity) {
                         return;
                     }
-                    self.selected_entity = Some(found_entity.index());
-                    godot_print!("Selected entity {}", found_entity);
+                    self.set_selected_entity(Some(found_entity.index()), owner);
                 }
                 Some(selected_entity) => {
                     let selected_entity = world
@@ -186,18 +208,18 @@ impl GameWorld {
                                     godot_print!("Target destroyed");
                                     world.delete(*found_entity);
                                 }
-                                self.selected_entity = None;
+                                self.set_selected_entity(None, owner);
                             } else {
                                 let mut selected_hexagon =
                                     world.get_component_mut::<Hexagon>(selected_entity).unwrap();
                                 selected_hexagon
                                     .set_axial(clicked_hexagon.get_q(), clicked_hexagon.get_r());
-                                self.selected_entity = None;
+                                self.set_selected_entity(None, owner);
                             }
                         }
                     }
                 }
             }
-        })
+        });
     }
 }
