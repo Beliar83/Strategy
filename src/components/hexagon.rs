@@ -20,13 +20,13 @@ impl Hexagon {
     /// Creates a position from axial coordinates
     pub fn new_axial(q: i32, r: i32, size: i32) -> Self {
         // https://www.redblobgames.com/grids/hexagons/#conversions-axial
-        let mut hexagon = Hexagon { q, r, s: 0, size };
-        hexagon.update_s();
+        let hexagon = Hexagon {
+            q,
+            r,
+            s: calculate_axis(q, r),
+            size,
+        };
         hexagon
-    }
-
-    fn update_s(&mut self) {
-        self.s = -self.r - self.q;
     }
 
     /// Creates a position from cube coordinates
@@ -50,22 +50,6 @@ impl Hexagon {
         self.size
     }
 
-    pub fn set_size(&mut self, size: i32) {
-        self.size = size
-    }
-
-    pub fn set_axial(&mut self, q: i32, r: i32) {
-        self.q = q;
-        self.r = r;
-        self.update_s();
-    }
-
-    pub fn set_cube(&mut self, q: i32, r: i32, s: i32) {
-        self.q = q;
-        self.r = r;
-        self.s = s;
-    }
-
     pub fn distance_to(&self, other: &Hexagon) -> i32 {
         // https://www.redblobgames.com/grids/hexagons/#distances-cube
         ((self.q - other.q).abs() + (self.r - other.r).abs() + (self.s - other.s).abs()) / 2
@@ -74,6 +58,10 @@ impl Hexagon {
     pub fn is_neighbour(&self, other: &Hexagon) -> bool {
         self.distance_to(&other) == 1
     }
+}
+
+fn calculate_axis(axis_1: i32, axis_2: i32) -> i32 {
+    -axis_1 - axis_2
 }
 
 #[cfg(test)]
@@ -105,34 +93,6 @@ mod tests {
         s_8: (2, -2, 0),
         s_9: (-9, 5, 4),
         s_10: (-9, -4, 13),
-    }
-
-    macro_rules! set_axial_calculates_s_correctly {
-        ($($name:ident: $value:expr,)*) => {
-        $(
-            #[test]
-            fn $name() {
-                let (q, r, expected) = $value;
-                let mut input = Hexagon::new_axial(0, 0, 0);
-                input.set_axial(q, r);
-                assert_eq!(expected, input.s);
-            }
-        )*
-        }
-    }
-
-    set_axial_calculates_s_correctly! {
-        set_s_0: (0, 0, 0),
-        set_s_1: (1, 0, -1),
-        set_s_2: (1, 1, -2),
-        set_s_3: (0, 1, -1),
-        set_s_4: (-1, 0, 1),
-        set_s_5: (-1, -1, 2),
-        set_s_6: (0, -1, 1),
-        set_s_7: (5, -2, -3),
-        set_s_8: (2, -2, 0),
-        set_s_9: (-9, 5, 4),
-        set_s_10: (-9, -4, 13),
     }
 
     macro_rules! is_neighbour_returns_true_for_neighbour_positions {

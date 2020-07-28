@@ -1,13 +1,14 @@
 use crate::components::hexagon::Hexagon;
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
-use crate::components::unit::{attack, Unit};
+use crate::components::unit::{CanMove, Unit};
 use crate::systems::hexgrid::create_grid;
-use crate::systems::{with_world, Process};
+use crate::systems::{with_world, Process, Selected};
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
 use gdnative::prelude::*;
 use legion::prelude::*;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 
 #[derive(NativeClass)]
@@ -35,15 +36,30 @@ impl GameWorld {
         }
     }
 
-    fn set_selected_entity(&mut self, entity: Option<u32>, owner: TRef<Node2D>) {
-        self.selected_entity = entity;
+    fn set_selected_entity(&mut self, entity: Option<&Entity>, world: &mut World) {
+        self.selected_entity = entity.and_then(|entity| Some(entity.index()));
+
+        let old_selected = <Read<Hexagon>>::query()
+            .filter(tag_value(&Selected(true)))
+            .iter_entities(world)
+            .next()
+            .and_then(|data| Some(data.0));
+
+        match old_selected {
+            None => {}
+            Some(entity) => {
+                world
+                    .add_tag(entity, Selected(false))
+                    .expect("Could not add/updated selected tag to entity");
+            }
+        }
 
         match entity {
-            None => {
-                owner.emit_signal("entity_selected", &[Variant::new()]);
-            }
+            None => self.selected_entity = None,
             Some(entity) => {
-                owner.emit_signal("entity_selected", &[Variant::from_u64(entity as u64)]);
+                world
+                    .add_tag(*entity, Selected(true))
+                    .expect("Could not add/updated selected tag to entity");
             }
         }
     }
@@ -71,23 +87,28 @@ impl GameWorld {
             with_world(|world| {
                 let node = world.get_component::<NodeComponent>(entity).unwrap();
                 self.node_entity.insert(entity.index(), node.node);
-                unsafe {
-                    node.node
-                        .assume_safe()
-                        .connect(
-                            "hex_clicked",
-                            owner,
-                            "hex_clicked",
-                            VariantArray::new_shared(),
-                            0,
-                        )
-                        .unwrap();
+                let node = unsafe { node.node.assume_safe() };
+                if node.is_connected("hex_clicked", owner, "hex_clicked") {
+                    return;
                 }
+
+                node.connect(
+                    "hex_clicked",
+                    owner,
+                    "hex_clicked",
+                    VariantArray::new_shared(),
+                    0,
+                )
+                .unwrap();
             });
         }
 
         for entity in removed_entities {
-            unsafe { self.node_entity[&entity.index()].assume_safe() }.queue_free();
+            with_world(|world| {
+                if !world.has_component::<NodeComponent>(entity) {
+                    unsafe { self.node_entity[&entity.index()].assume_safe() }.queue_free();
+                }
+            });
         }
     }
 
@@ -106,7 +127,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 1),
+                    Unit::new(10, 2, 1, 5, 5),
                 )],
             );
             world.insert(
@@ -118,14 +139,14 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 1),
+                    Unit::new(10, 2, 1, 5, 5),
                 )],
             );
         });
     }
 
     #[export]
-    fn hex_clicked(&mut self, owner: TRef<Node2D>, data: Variant) {
+    fn hex_clicked(&mut self, _owner: TRef<Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_world(|world| {
             let query = <Read<Hexagon>>::query();
@@ -175,7 +196,14 @@ impl GameWorld {
                     if !world.has_component::<Unit>(*found_entity) {
                         return;
                     }
-                    self.set_selected_entity(Some(found_entity.index()), owner);
+
+                    match world.add_tag(*found_entity, Selected(true)) {
+                        Err(_) => {
+                            godot_print!("Could not add selected tag to entity.");
+                        }
+                        _ => {}
+                    }
+                    self.set_selected_entity(Some(found_entity), world);
                 }
                 Some(selected_entity) => {
                     let selected_entity = world
@@ -188,33 +216,74 @@ impl GameWorld {
                                 if !world.has_component::<Unit>(selected_entity) {
                                     return;
                                 }
-                                let selected_unit = *world
-                                    .get_component::<Unit>(selected_entity)
-                                    .unwrap()
-                                    .clone();
-                                let mut clicked_unit =
-                                    world.get_component_mut::<Unit>(*found_entity).unwrap();
-                                godot_print!(
-                                    "Attacking with {} against {} ({})",
-                                    selected_unit.damage,
-                                    clicked_unit.integrity,
-                                    clicked_unit.armor,
-                                );
-                                let result = attack(&selected_unit, &mut *clicked_unit);
-                                drop(clicked_unit);
+                                let result = {
+                                    let selected_unit =
+                                        world.get_component::<Unit>(selected_entity).unwrap();
+
+                                    let clicked_unit =
+                                        world.get_component::<Unit>(*found_entity).unwrap();
+                                    godot_print!(
+                                        "Attacking with {} against {} ({})",
+                                        selected_unit.damage,
+                                        clicked_unit.integrity,
+                                        clicked_unit.armor,
+                                    );
+                                    selected_unit.attack(clicked_unit.borrow())
+                                };
+
                                 godot_print!("Damage dealt: {}", result.actual_damage);
-                                godot_print!("Remaining integrity: {}", result.remaining_integrity);
-                                if result.remaining_integrity <= 0 {
+                                godot_print!("Remaining integrity: {}", result.defender.integrity);
+                                world
+                                    .add_component(selected_entity, result.attacker)
+                                    .expect("Could not update data of selected unit");
+
+                                if result.defender.integrity <= 0 {
                                     godot_print!("Target destroyed");
                                     world.delete(*found_entity);
+                                } else {
+                                    world
+                                        .add_component(*found_entity, result.defender)
+                                        .expect("Could not update data of clicked unit");
                                 }
-                                self.set_selected_entity(None, owner);
+
+                                self.set_selected_entity(None, world);
                             } else {
-                                let mut selected_hexagon =
-                                    world.get_component_mut::<Hexagon>(selected_entity).unwrap();
-                                selected_hexagon
-                                    .set_axial(clicked_hexagon.get_q(), clicked_hexagon.get_r());
-                                self.set_selected_entity(None, owner);
+                                let selected_unit =
+                                    world.get_component::<Unit>(selected_entity).unwrap();
+                                let selected_hexagon =
+                                    world.get_component::<Hexagon>(selected_entity).unwrap();
+                                let distance = selected_hexagon.distance_to(&clicked_hexagon);
+                                let can_move = selected_unit.can_move(distance);
+                                match can_move {
+                                    CanMove::Yes(remaining_range) => {
+                                        let updated_hexagon = Hexagon::new_axial(
+                                            clicked_hexagon.get_q(),
+                                            clicked_hexagon.get_r(),
+                                            selected_hexagon.get_size(),
+                                        );
+                                        let updated_unit = Unit::new(
+                                            selected_unit.integrity,
+                                            selected_unit.damage,
+                                            selected_unit.armor,
+                                            selected_unit.mobility,
+                                            remaining_range,
+                                        );
+                                        drop(clicked_hexagon);
+                                        drop(selected_unit);
+                                        drop(selected_hexagon);
+                                        world
+                                            .add_component(selected_entity, updated_hexagon)
+                                            .expect(
+                                                "Could not updated selected entity hexagon data",
+                                            );
+
+                                        world
+                                            .add_component(selected_entity, updated_unit)
+                                            .expect("Could not updated selected entity unit data");
+                                        self.set_selected_entity(None, world);
+                                    }
+                                    CanMove::No => {}
+                                }
                             }
                         }
                     }

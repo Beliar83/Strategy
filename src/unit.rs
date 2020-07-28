@@ -1,7 +1,7 @@
 use crate::components::unit::Unit as UnitComponent;
-use crate::systems::with_world;
+use crate::systems::{with_world, Selected};
 use gdnative::prelude::*;
-use legion::prelude::{Entity, EntityStore};
+use legion::prelude::*;
 
 #[derive(NativeClass)]
 #[inherit(Node)]
@@ -19,32 +19,6 @@ impl Unit {
             name: "hex_clicked",
             args: &[],
         });
-    }
-
-    #[export]
-    fn _ready(&self, owner: TRef<Node>) {
-        let parent = owner.get_parent();
-
-        let parent = match parent.and_then(|parent| unsafe { parent.assume_safe_if_sane() }) {
-            None => {
-                return;
-            }
-            Some(parent) => parent,
-        };
-
-        let result = parent.connect(
-            "entity_selected",
-            owner,
-            "entity_selected",
-            VariantArray::new_shared(),
-            0,
-        );
-
-        match result {
-            _ => {
-                return;
-            }
-        }
     }
 
     #[export]
@@ -75,36 +49,25 @@ impl Unit {
                             integrity_label.set_text(format!("{}", unit.integrity));
                         }
                     };
+                    let outline = owner.get_node("Outline");
+
+                    let outline = outline
+                        .and_then(|outline| unsafe { outline.assume_safe_if_sane() })
+                        .and_then(|outline| outline.cast::<CanvasItem>());
+                    let outline = match outline {
+                        None => {
+                            return;
+                        }
+                        Some(outline) => outline,
+                    };
+                    let selected = world.get_tag::<Selected>(entity);
+                    let visible = match selected {
+                        None => false,
+                        Some(selected) => selected.0,
+                    };
+                    outline.set_visible(visible);
                 }
             }
         })
-    }
-
-    #[export]
-    pub fn entity_selected(&self, owner: TRef<Node>, data: Variant) {
-        let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
-        let outline = owner.get_node("Outline");
-
-        let outline = outline
-            .and_then(|outline| unsafe { outline.assume_safe_if_sane() })
-            .and_then(|outline| outline.cast::<CanvasItem>());
-        let outline = match outline {
-            None => {
-                return;
-            }
-            Some(outline) => outline,
-        };
-        let visible;
-        if !data.is_nil() {
-            let entity_index = data.to_u64() as u32;
-            if entity_index == self_entity_index {
-                visible = true;
-            } else {
-                visible = false;
-            }
-        } else {
-            visible = false;
-        }
-        outline.set_visible(visible);
     }
 }

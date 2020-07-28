@@ -18,6 +18,23 @@ where
 
 pub struct Delta(pub f32);
 
+pub struct Selected(pub bool);
+
+unsafe impl Send for Selected {}
+unsafe impl Sync for Selected {}
+
+impl Clone for Selected {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+impl PartialEq for Selected {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
 pub struct Process {
     resources: Resources,
     schedule: Schedule,
