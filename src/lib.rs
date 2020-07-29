@@ -2,6 +2,7 @@ mod components;
 mod gameworld;
 mod hexfield;
 mod systems;
+mod tags;
 mod unit;
 
 use gdnative::prelude::*;

@@ -68,6 +68,6 @@ impl Unit {
                     outline.set_visible(visible);
                 }
             }
-        })
+        });
     }
 }

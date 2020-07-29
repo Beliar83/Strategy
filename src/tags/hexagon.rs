@@ -1,10 +1,15 @@
 /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct Hexagon {
     q: i32,
     r: i32,
     s: i32,
     size: i32,
+}
+impl PartialEq for Hexagon {
+    fn eq(&self, other: &Self) -> bool {
+        self.q.eq(&other.q) && self.r.eq(&other.r)
+    }
 }
 
 impl Hexagon {

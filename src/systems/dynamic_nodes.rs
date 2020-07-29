@@ -1,6 +1,7 @@
 use super::hexgrid::get_2d_position_from_hex;
 use crate::components::node_component::NodeComponent;
-use crate::components::{hexagon::Hexagon, node_template::NodeTemplate};
+use crate::components::node_template::NodeTemplate;
+use crate::tags::hexagon::Hexagon;
 use gdnative::prelude::*;
 use legion::prelude::*;
 
@@ -80,7 +81,7 @@ where
 
 pub fn update_nodes() -> Box<dyn Runnable> {
     SystemBuilder::new("update_nodes")
-        .with_query(<(Write<NodeComponent>, Read<Hexagon>)>::query())
+        .with_query(<(Write<NodeComponent>, Tagged<Hexagon>)>::query())
         .build_thread_local(|_, world, _, query| {
             for (node, position) in query.iter_mut(world) {
                 unsafe {
