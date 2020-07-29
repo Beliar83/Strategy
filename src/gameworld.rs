@@ -126,7 +126,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5),
+                    Unit::new(10, 2, 1, 5, 5, 1),
                 )],
             );
             world.insert(
@@ -137,7 +137,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5),
+                    Unit::new(10, 2, 1, 5, 5, 1),
                 )],
             );
         });
@@ -215,34 +215,53 @@ impl GameWorld {
                                     }
                                     let selected_unit =
                                         *world.get_component::<Unit>(selected_entity).unwrap();
-                                    let clicked_unit =
-                                        *world.get_component::<Unit>(clicked_entity).unwrap();
-                                    let result = { selected_unit.attack(clicked_unit.borrow()) };
-
-                                    godot_print!(
-                                        "Attacking with {} against {} ({})",
-                                        selected_unit.damage,
-                                        clicked_unit.integrity,
-                                        clicked_unit.armor,
-                                    );
-                                    godot_print!("Damage dealt: {}", result.actual_damage);
-                                    godot_print!(
-                                        "Remaining integrity: {}",
-                                        result.defender.integrity
-                                    );
-                                    world
-                                        .add_component(selected_entity, result.attacker)
-                                        .expect("Could not update data of selected unit");
-
-                                    if result.defender.integrity <= 0 {
-                                        godot_print!("Target destroyed");
-                                        world.delete(clicked_entity);
+                                    if selected_unit.remaining_attacks <= 0 {
+                                        godot_print!("Attacker has no attacks left");
                                     } else {
-                                        world
-                                            .add_component(clicked_entity, result.defender)
-                                            .expect("Could not update data of clicked unit");
-                                    }
+                                        let clicked_unit =
+                                            *world.get_component::<Unit>(clicked_entity).unwrap();
+                                        let result =
+                                            { selected_unit.attack(clicked_unit.borrow()) };
 
+                                        match result {
+                                            Ok(result) => {
+                                                godot_print!(
+                                                    "Attacking with {} against {} ({})",
+                                                    selected_unit.damage,
+                                                    clicked_unit.integrity,
+                                                    clicked_unit.armor,
+                                                );
+                                                godot_print!(
+                                                    "Damage dealt: {}",
+                                                    result.actual_damage
+                                                );
+                                                godot_print!(
+                                                    "Remaining integrity: {}",
+                                                    result.defender.integrity
+                                                );
+                                                world
+                                                    .add_component(selected_entity, result.attacker)
+                                                    .expect(
+                                                        "Could not update data of selected unit",
+                                                    );
+
+                                                if result.defender.integrity <= 0 {
+                                                    godot_print!("Target destroyed");
+                                                    world.delete(clicked_entity);
+                                                } else {
+                                                    world
+                                                        .add_component(
+                                                            clicked_entity,
+                                                            result.defender,
+                                                        )
+                                                        .expect(
+                                                            "Could not update data of clicked unit",
+                                                        );
+                                                }
+                                            }
+                                            Err(_) => {}
+                                        }
+                                    }
                                     self.set_selected_entity(None, world);
                                 } else {
                                     let selected_unit =
@@ -264,6 +283,7 @@ impl GameWorld {
                                                 selected_unit.armor,
                                                 selected_unit.mobility,
                                                 remaining_range,
+                                                selected_unit.remaining_attacks,
                                             );
                                             drop(clicked_hexagon);
                                             drop(selected_unit);
