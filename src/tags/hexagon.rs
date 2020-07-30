@@ -4,7 +4,6 @@ pub struct Hexagon {
     q: i32,
     r: i32,
     s: i32,
-    size: i32,
 }
 impl PartialEq for Hexagon {
     fn eq(&self, other: &Self) -> bool {
@@ -14,12 +13,7 @@ impl PartialEq for Hexagon {
 
 impl Hexagon {
     pub fn zero() -> Self {
-        Hexagon {
-            q: 0,
-            r: 0,
-            s: 0,
-            size: 0,
-        }
+        Hexagon { q: 0, r: 0, s: 0 }
     }
 
     /// Creates a position from axial coordinates
@@ -29,14 +23,13 @@ impl Hexagon {
             q,
             r,
             s: calculate_axis(q, r),
-            size,
         };
         hexagon
     }
 
     /// Creates a position from cube coordinates
-    pub fn new_cube(q: i32, r: i32, s: i32, size: i32) -> Self {
-        Hexagon { q, r, s, size }
+    pub fn new_cube(q: i32, r: i32, s: i32) -> Self {
+        Hexagon { q, r, s }
     }
 
     pub fn get_q(&self) -> i32 {
@@ -49,10 +42,6 @@ impl Hexagon {
 
     pub fn get_s(&self) -> i32 {
         self.s
-    }
-
-    pub fn get_size(&self) -> i32 {
-        self.size
     }
 
     pub fn distance_to(&self, other: &Hexagon) -> i32 {

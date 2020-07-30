@@ -31,10 +31,10 @@ pub fn create_grid(
     }
 }
 
-pub fn get_2d_position_from_hex(hex: &Hexagon) -> Vector2 {
-    let x = hex.get_size() as f32
+pub fn get_2d_position_from_hex(hex: &Hexagon, hexfield_size: i32) -> Vector2 {
+    let x = hexfield_size as f32
         * (3.0_f32.sqrt() * (hex.get_q() as f32) + 3.0_f32.sqrt() / 2.0 * (hex.get_r() as f32));
-    let y = hex.get_size() as f32 * (3.0 / 2.0 * (hex.get_r() as f32));
+    let y = hexfield_size as f32 * (3.0 / 2.0 * (hex.get_r() as f32));
     return Vector2::new(x, y);
 }
 

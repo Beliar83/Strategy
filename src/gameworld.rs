@@ -2,7 +2,7 @@ use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::systems::hexgrid::create_grid;
-use crate::systems::{with_world, Process, Selected};
+use crate::systems::{with_world, Selected, UpdateNotes};
 use crate::tags::hexagon::Hexagon;
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
@@ -13,9 +13,9 @@ use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
-#[register_with(Self::register_signals)]
+#[register_with(Self::register)]
 pub struct GameWorld {
-    process: Process,
+    process: UpdateNotes,
     event_receiver: Receiver<Event>,
     node_entity: HashMap<u32, Ref<Node2D>>,
     selected_entity: Option<u32>,
@@ -29,7 +29,7 @@ impl GameWorld {
             world.subscribe(sender.clone(), component::<NodeComponent>());
         });
         Self {
-            process: Process::new(),
+            process: UpdateNotes::new(40),
             event_receiver: receiver,
             node_entity: HashMap::new(),
             selected_entity: None,
@@ -64,11 +64,17 @@ impl GameWorld {
         }
     }
 
-    fn register_signals(builder: &ClassBuilder<Self>) {
+    fn register(builder: &ClassBuilder<Self>) {
         builder.add_signal(Signal {
             name: "entity_selected",
             args: &[],
         });
+        builder
+            .add_property("hexfield_size")
+            .with_default(40)
+            .with_getter(|instance, _| instance.process.hexfield_size)
+            .with_setter(|instance, _, value| instance.process.hexfield_size = value)
+            .done();
     }
 
     #[export]
@@ -279,11 +285,7 @@ impl GameWorld {
         let can_move = selected_unit.can_move(distance);
         match can_move {
             CanMove::Yes(remaining_range) => {
-                let updated_hexagon = Hexagon::new_axial(
-                    hexagon.get_q(),
-                    hexagon.get_r(),
-                    selected_hexagon.get_size(),
-                );
+                let updated_hexagon = Hexagon::new_axial(hexagon.get_q(), hexagon.get_r(), 0);
                 let updated_selected_unit = Unit::new(
                     selected_unit.integrity,
                     selected_unit.damage,

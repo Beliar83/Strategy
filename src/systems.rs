@@ -18,6 +18,8 @@ where
 
 pub struct Delta(pub f32);
 
+pub struct HexfieldSize(pub i32);
+
 pub struct Selected(pub bool);
 
 unsafe impl Send for Selected {}
@@ -35,27 +37,29 @@ impl PartialEq for Selected {
     }
 }
 
-pub struct Process {
+pub struct UpdateNotes {
     resources: Resources,
     schedule: Schedule,
+    pub hexfield_size: i32,
 }
 
-impl Process {
-    pub fn new() -> Self {
+impl UpdateNotes {
+    pub fn new(hexfield_size: i32) -> Self {
         let mut resources = Resources::default();
-        resources.insert(Delta(0.));
+        resources.insert(HexfieldSize(hexfield_size));
 
         let schedule = Schedule::builder().add_thread_local(update_nodes()).build();
         Self {
             resources,
             schedule,
+            hexfield_size,
         }
     }
 
-    pub fn execute(&mut self, root: &Node2D, delta: f64) {
+    pub fn execute(&mut self, root: &Node2D, _delta: f64) {
         self.resources
-            .get_mut::<Delta>()
-            .map(|mut d| d.0 = delta as f32);
+            .get_mut::<HexfieldSize>()
+            .map(|mut d| d.0 = self.hexfield_size);
 
         with_world(|world| {
             create_nodes(world, root);

@@ -1,6 +1,7 @@
 use super::hexgrid::get_2d_position_from_hex;
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
+use crate::systems::HexfieldSize;
 use crate::tags::hexagon::Hexagon;
 use gdnative::prelude::*;
 use legion::prelude::*;
@@ -82,10 +83,11 @@ where
 pub fn update_nodes() -> Box<dyn Runnable> {
     SystemBuilder::new("update_nodes")
         .with_query(<(Write<NodeComponent>, Tagged<Hexagon>)>::query())
-        .build_thread_local(|_, world, _, query| {
+        .read_resource::<HexfieldSize>()
+        .build_thread_local(|_, world, hexfield_size, query| {
             for (node, position) in query.iter_mut(world) {
                 unsafe {
-                    let position = get_2d_position_from_hex(&position);
+                    let position = get_2d_position_from_hex(&position, hexfield_size.0);
                     node.node.assume_safe().set_position(position);
                 }
             }
