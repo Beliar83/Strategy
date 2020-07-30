@@ -1,6 +1,6 @@
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
-use crate::components::unit::{CanMove, Unit};
+use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::systems::hexgrid::create_grid;
 use crate::systems::{with_world, Process, Selected};
 use crate::tags::hexagon::Hexagon;
@@ -209,15 +209,14 @@ impl GameWorld {
                         match selected_entity {
                             None => {}
                             Some(selected_entity) => {
-                                if world.has_component::<Unit>(clicked_entity) {
-                                    if !world.has_component::<Unit>(selected_entity) {
-                                        return;
-                                    }
-                                    let selected_unit =
-                                        *world.get_component::<Unit>(selected_entity).unwrap();
-                                    if selected_unit.remaining_attacks <= 0 {
-                                        godot_print!("Attacker has no attacks left");
-                                    } else {
+                                if (selected_entity == clicked_entity) {
+                                } else {
+                                    if world.has_component::<Unit>(clicked_entity) {
+                                        if !world.has_component::<Unit>(selected_entity) {
+                                            return;
+                                        }
+                                        let selected_unit =
+                                            *world.get_component::<Unit>(selected_entity).unwrap();
                                         let clicked_unit =
                                             *world.get_component::<Unit>(clicked_entity).unwrap();
                                         let result =
@@ -226,12 +225,6 @@ impl GameWorld {
                                         match result {
                                             Ok(result) => {
                                                 godot_print!(
-                                                    "Attacking with {} against {} ({})",
-                                                    selected_unit.damage,
-                                                    clicked_unit.integrity,
-                                                    clicked_unit.armor,
-                                                );
-                                                godot_print!(
                                                     "Damage dealt: {}",
                                                     result.actual_damage
                                                 );
@@ -239,77 +232,85 @@ impl GameWorld {
                                                     "Remaining integrity: {}",
                                                     result.defender.integrity
                                                 );
-                                                world
-                                                    .add_component(selected_entity, result.attacker)
-                                                    .expect(
-                                                        "Could not update data of selected unit",
-                                                    );
-
-                                                if result.defender.integrity <= 0 {
-                                                    godot_print!("Target destroyed");
-                                                    world.delete(clicked_entity);
-                                                } else {
-                                                    world
-                                                        .add_component(
-                                                            clicked_entity,
-                                                            result.defender,
-                                                        )
-                                                        .expect(
-                                                            "Could not update data of clicked unit",
-                                                        );
-                                                }
-                                            }
-                                            Err(_) => {}
-                                        }
-                                    }
-                                    self.set_selected_entity(None, world);
-                                } else {
-                                    let selected_unit =
-                                        world.get_component::<Unit>(selected_entity).unwrap();
-                                    let selected_hexagon =
-                                        world.get_tag::<Hexagon>(selected_entity).unwrap();
-                                    let distance = selected_hexagon.distance_to(&clicked_hexagon);
-                                    let can_move = selected_unit.can_move(distance);
-                                    match can_move {
-                                        CanMove::Yes(remaining_range) => {
-                                            let updated_hexagon = Hexagon::new_axial(
-                                                clicked_hexagon.get_q(),
-                                                clicked_hexagon.get_r(),
-                                                selected_hexagon.get_size(),
-                                            );
-                                            let updated_selected_unit = Unit::new(
-                                                selected_unit.integrity,
-                                                selected_unit.damage,
-                                                selected_unit.armor,
-                                                selected_unit.mobility,
-                                                remaining_range,
-                                                selected_unit.remaining_attacks,
-                                            );
-                                            drop(clicked_hexagon);
-                                            drop(selected_unit);
-                                            world.add_tag(selected_entity, updated_hexagon).expect(
-                                                "Could not updated selected entity hexagon data",
-                                            );
-
-                                            world
-                                                .add_component(
+                                                GameWorld::handle_attack_result(
+                                                    world,
                                                     selected_entity,
-                                                    updated_selected_unit,
-                                                )
-                                                .expect(
-                                                    "Could not updated selected entity unit data",
+                                                    clicked_entity,
+                                                    result,
                                                 );
-                                            self.set_selected_entity(None, world);
+                                            }
+                                            Err(error) => match error {
+                                                AttackError::NoAttacksLeft => {
+                                                    godot_print!("Attacker has no attacks left")
+                                                }
+                                            },
                                         }
-                                        CanMove::No => {}
+                                    } else {
+                                        GameWorld::move_entity_to_hexagon(
+                                            selected_entity,
+                                            &clicked_hexagon,
+                                            world,
+                                        );
                                     }
                                 }
+                                self.set_selected_entity(None, world);
                             }
                         }
                     };
                 }
             }
         });
+    }
+
+    fn move_entity_to_hexagon(entity: Entity, hexagon: &Hexagon, world: &mut World) {
+        let selected_unit = *world.get_component::<Unit>(entity).unwrap();
+        let selected_hexagon = *world.get_tag::<Hexagon>(entity).unwrap();
+        let distance = selected_hexagon.distance_to(&hexagon);
+        let can_move = selected_unit.can_move(distance);
+        match can_move {
+            CanMove::Yes(remaining_range) => {
+                let updated_hexagon = Hexagon::new_axial(
+                    hexagon.get_q(),
+                    hexagon.get_r(),
+                    selected_hexagon.get_size(),
+                );
+                let updated_selected_unit = Unit::new(
+                    selected_unit.integrity,
+                    selected_unit.damage,
+                    selected_unit.armor,
+                    selected_unit.mobility,
+                    remaining_range,
+                    selected_unit.remaining_attacks,
+                );
+                world
+                    .add_tag(entity, updated_hexagon)
+                    .expect("Could not updated selected entity hexagon data");
+
+                world
+                    .add_component(entity, updated_selected_unit)
+                    .expect("Could not updated selected entity unit data");
+            }
+            CanMove::No => {}
+        }
+    }
+
+    fn handle_attack_result(
+        world: &mut World,
+        attacker: Entity,
+        defender: Entity,
+        result: AttackResult,
+    ) {
+        world
+            .add_component(attacker, result.attacker)
+            .expect("Could not update data of selected unit");
+
+        if result.defender.integrity <= 0 {
+            world.delete(defender);
+        } else {
+            world
+                .add_component(defender, result.defender)
+                .expect("Could not update data of clicked unit");
+        }
     }
     fn get_entities_at_hexagon(hexagon: &Hexagon, world: &World) -> Vec<Entity> {
         <Tagged<Hexagon>>::query()
@@ -356,8 +357,7 @@ mod tests {
     fn get_entities_at_hexagon_returns_all_entities_with_the_correct_tag_value() {
         let world = &mut Universe::new().create_world();
         world.insert((Hexagon::new_axial(0, 0, 0),), vec![(0,)]);
-        world.insert((Hexagon::new_axial(1, 3, 0),), vec![(0,)]);
-        world.insert((Hexagon::new_axial(1, 3, 0),), vec![(0,)]);
+        world.insert((Hexagon::new_axial(1, 3, 0),), vec![(0,), (0,)]);
 
         let result = GameWorld::get_entities_at_hexagon(&Hexagon::new_axial(1, 3, 0), world);
         assert!(result.iter().all(|entity| {
@@ -365,5 +365,90 @@ mod tests {
             hexagon.get_q() == 1 && hexagon.get_r() == 3
         }));
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn handle_attack_result_updates_components() {
+        let world = &mut Universe::new().create_world();
+        let attacker = world
+            .insert((), vec![(Unit::new(1, 1, 0, 0, 0, 1),)])
+            .first()
+            .unwrap()
+            .clone();
+        let defender = world
+            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0),)])
+            .first()
+            .unwrap()
+            .clone();
+        let result = AttackResult {
+            attacker: Unit::new(1, 1, 0, 0, 0, 0),
+            defender: Unit::new(1, 1, 0, 0, 0, 0),
+            actual_damage: 1,
+        };
+
+        GameWorld::handle_attack_result(world, attacker, defender, result);
+
+        let changed_attacker = world.get_component::<Unit>(attacker).unwrap();
+        assert_eq!(changed_attacker.remaining_attacks, 0);
+        let changed_defender = world.get_component::<Unit>(defender).unwrap();
+        assert_eq!(changed_defender.integrity, 1);
+    }
+
+    #[test]
+    fn handle_attack_result_removes_defender_when_integrity_lower_or_eq_0() {
+        let world = &mut Universe::new().create_world();
+        let attacker = world
+            .insert((), vec![(Unit::new(1, 2, 0, 0, 0, 1),)])
+            .first()
+            .unwrap()
+            .clone();
+        let defender = world
+            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0),)])
+            .first()
+            .unwrap()
+            .clone();
+        let result = AttackResult {
+            attacker: Unit::new(1, 1, 0, 0, 0, 0),
+            defender: Unit::new(0, 1, 0, 0, 0, 0),
+            actual_damage: 1,
+        };
+
+        GameWorld::handle_attack_result(world, attacker, defender, result);
+
+        assert!(!world.is_alive(defender));
+    }
+
+    #[test]
+    fn move_entity_to_hexagon_updates_entity() {
+        let world = &mut Universe::new().create_world();
+        let entity = world
+            .insert(
+                (Hexagon::new_axial(0, 0, 0),),
+                vec![(Unit::new(0, 0, 0, 0, 2, 0),)],
+            )
+            .first()
+            .unwrap()
+            .clone();
+
+        GameWorld::move_entity_to_hexagon(entity, &Hexagon::new_axial(1, 1, 0), world);
+
+        let hexagon = world.get_tag::<Hexagon>(entity).unwrap();
+        assert_eq!(hexagon.get_q(), 1);
+        assert_eq!(hexagon.get_r(), 1);
+    }
+
+    #[test]
+    fn move_entity_to_hexagon_does_nothing_if_entity_cannot_move() {
+        let world = &mut Universe::new().create_world();
+        let entity = *world
+            .insert(
+                (Hexagon::new_axial(5, 5, 0),),
+                vec![(Unit::new(0, 0, 0, 0, 1, 0),)],
+            )
+            .first()
+            .unwrap();
+        let hexagon = world.get_tag::<Hexagon>(entity).unwrap();
+        assert_eq!(hexagon.get_q(), 5);
+        assert_eq!(hexagon.get_r(), 5);
     }
 }

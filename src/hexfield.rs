@@ -71,14 +71,14 @@ impl HexField {
         let in_range = HexField::is_selected_in_range(owner);
         if self.hovered {
             if !in_range {
-                HexField::SetFieldColor(owner, Color::rgb(0.0, 0.0, 0.5));
+                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.5));
             } else {
-                HexField::SetFieldColor(owner, Color::rgb(0.0, 0.0, 1.0));
+                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 1.0));
             }
         } else if in_range {
-            HexField::SetFieldColor(owner, Color::rgb(0.0, 0.0, 0.5));
+            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.5));
         } else {
-            HexField::SetFieldColor(owner, Color::rgb(1.0, 1.0, 1.0));
+            HexField::set_field_color(owner, Color::rgb(1.0, 1.0, 1.0));
         }
     }
 
@@ -130,7 +130,7 @@ impl HexField {
         self.hovered = false;
     }
 
-    fn SetFieldColor(owner: TRef<Area2D>, color: Color) {
+    fn set_field_color(owner: TRef<Area2D>, color: Color) {
         match owner
             .get_node("Field")
             .and_then(|field| unsafe { field.assume_safe_if_sane() })
