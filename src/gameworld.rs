@@ -262,6 +262,16 @@ impl GameWorld {
         });
     }
 
+    #[export]
+    pub fn on_new_round(&mut self, _owner: TRef<Node2D>) {
+        with_world(|world| {
+            for mut unit in <Write<Unit>>::query().iter_mut(world) {
+                unit.remaining_attacks = 1;
+                unit.remaining_range = unit.mobility;
+            }
+        });
+    }
+
     fn move_entity_to_hexagon(entity: Entity, hexagon: &Hexagon, world: &mut World) {
         let selected_unit = *world.get_component::<Unit>(entity).unwrap();
         let selected_hexagon = *world.get_tag::<Hexagon>(entity).unwrap();
