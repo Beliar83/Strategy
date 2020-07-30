@@ -38,7 +38,7 @@ impl Unit {
             let mut attacker = self.clone();
             let mut defender = defender.clone();
             defender.integrity -= actual_damage;
-            attacker.mobility = 0;
+            attacker.remaining_range = 0;
             attacker.remaining_attacks -= 1;
             Ok(AttackResult {
                 actual_damage,
@@ -90,16 +90,16 @@ mod tests {
     }
 
     #[test]
-    pub fn attack_sets_attacker_mobility_to_0() {
+    pub fn attack_sets_attacker_remaining_range_to_0() {
         let defender = Unit::new(5, 0, 0, 0, 0, 0);
-        let attacker = Unit::new(0, 4, 0, 5, 0, 1);
+        let attacker = Unit::new(0, 4, 0, 0, 5, 1);
 
         let result = attacker.attack(&defender);
         let result = match result {
             Ok(x) => x,
             Err(_) => panic!("Expected a result with Ok value"),
         };
-        assert_eq!(result.attacker.mobility, 0);
+        assert_eq!(result.attacker.remaining_range, 0);
     }
 
     #[test]
