@@ -13,7 +13,7 @@ pub fn create_grid(
     let radius = radius as i32;
     for q in -radius..radius + 1 {
         for r in -radius..radius + 1 {
-            let hex_position = Hexagon::new_axial(q, r, field_size);
+            let hex_position = Hexagon::new_axial(q, r);
 
             if hex_position.distance_to(&Hexagon::zero()) > radius {
                 continue;

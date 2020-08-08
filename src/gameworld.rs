@@ -125,7 +125,7 @@ impl GameWorld {
         with_world(|world| {
             create_grid(4, "res://HexField.tscn".to_owned(), size, 1.0, world);
             world.insert(
-                (Hexagon::new_axial(0, 0, size),),
+                (Hexagon::new_axial(0, 0),),
                 vec![(
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
@@ -136,7 +136,7 @@ impl GameWorld {
                 )],
             );
             world.insert(
-                (Hexagon::new_axial(0, 1, size),),
+                (Hexagon::new_axial(0, 1),),
                 vec![(
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
@@ -285,7 +285,7 @@ impl GameWorld {
         let can_move = selected_unit.can_move(distance);
         match can_move {
             CanMove::Yes(remaining_range) => {
-                let updated_hexagon = Hexagon::new_axial(hexagon.get_q(), hexagon.get_r(), 0);
+                let updated_hexagon = Hexagon::new_axial(hexagon.get_q(), hexagon.get_r());
                 let updated_selected_unit = Unit::new(
                     selected_unit.integrity,
                     selected_unit.damage,
@@ -368,10 +368,10 @@ mod tests {
     #[test]
     fn get_entities_at_hexagon_returns_all_entities_with_the_correct_tag_value() {
         let world = &mut Universe::new().create_world();
-        world.insert((Hexagon::new_axial(0, 0, 0),), vec![(0,)]);
-        world.insert((Hexagon::new_axial(1, 3, 0),), vec![(0,), (0,)]);
+        world.insert((Hexagon::new_axial(0, 0),), vec![(0,)]);
+        world.insert((Hexagon::new_axial(1, 3),), vec![(0,), (0,)]);
 
-        let result = GameWorld::get_entities_at_hexagon(&Hexagon::new_axial(1, 3, 0), world);
+        let result = GameWorld::get_entities_at_hexagon(&Hexagon::new_axial(1, 3), world);
         assert!(result.iter().all(|entity| {
             let hexagon = world.get_tag::<Hexagon>(*entity).unwrap();
             hexagon.get_q() == 1 && hexagon.get_r() == 3
@@ -435,14 +435,14 @@ mod tests {
         let world = &mut Universe::new().create_world();
         let entity = world
             .insert(
-                (Hexagon::new_axial(0, 0, 0),),
+                (Hexagon::new_axial(0, 0),),
                 vec![(Unit::new(0, 0, 0, 0, 2, 0),)],
             )
             .first()
             .unwrap()
             .clone();
 
-        GameWorld::move_entity_to_hexagon(entity, &Hexagon::new_axial(1, 1, 0), world);
+        GameWorld::move_entity_to_hexagon(entity, &Hexagon::new_axial(1, 1), world);
 
         let hexagon = world.get_tag::<Hexagon>(entity).unwrap();
         assert_eq!(hexagon.get_q(), 1);
@@ -454,7 +454,7 @@ mod tests {
         let world = &mut Universe::new().create_world();
         let entity = *world
             .insert(
-                (Hexagon::new_axial(5, 5, 0),),
+                (Hexagon::new_axial(5, 5),),
                 vec![(Unit::new(0, 0, 0, 0, 1, 0),)],
             )
             .first()
