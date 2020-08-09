@@ -38,6 +38,14 @@ impl HexField {
             name: "hex_clicked",
             args: &[],
         });
+        builder.add_signal(Signal {
+            name: "hex_mouse_entered",
+            args: &[],
+        });
+        builder.add_signal(Signal {
+            name: "hex_mouse_exited",
+            args: &[],
+        });
     }
 
     #[export]
@@ -123,11 +131,19 @@ impl HexField {
     #[export]
     fn _on_field_mouse_entered(&mut self, owner: &Area2D) {
         self.hovered = true;
+        owner.emit_signal(
+            "hex_mouse_entered",
+            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+        );
     }
 
     #[export]
     fn _on_field_mouse_exited(&mut self, owner: TRef<Area2D>) {
         self.hovered = false;
+        owner.emit_signal(
+            "hex_mouse_exited",
+            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+        );
     }
 
     fn set_field_color(owner: TRef<Area2D>, color: Color) {

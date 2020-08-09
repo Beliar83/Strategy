@@ -42,6 +42,7 @@ pub fn create_nodes(world: &mut World, root: &Node2D) {
                 let node2d = node2d.into_shared();
                 unsafe {
                     let node2d = node2d.assume_safe_if_sane().unwrap();
+                    node2d.set_z_as_relative(false);
                     node2d.set_scale(Vector2::new(node_data.scale_x, node_data.scale_y));
                     node2d.set_meta("Entity", entity.index());
                 }

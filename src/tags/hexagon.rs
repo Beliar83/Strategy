@@ -1,5 +1,8 @@
+use crate::tags::hexagon::Direction::{East, NorthEast, NorthWest, SouthEast, SouthWest, West};
+use std::hash::Hash;
+
 /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Hexagon {
     q: i32,
     r: i32,
@@ -8,9 +11,11 @@ pub struct Hexagon {
 
 impl PartialEq for Hexagon {
     fn eq(&self, other: &Self) -> bool {
-        self.q.eq(&other.q) && self.r.eq(&other.r)
+        self.q.eq(&other.q) && self.r.eq(&other.r) && self.s.eq(&other.s)
     }
 }
+
+impl Eq for Hexagon {}
 
 impl Hexagon {
     pub fn zero() -> Self {

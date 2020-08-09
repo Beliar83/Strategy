@@ -1,14 +1,17 @@
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
-use crate::systems::hexgrid::create_grid;
+use crate::systems::hexgrid::{create_grid, get_2d_position_from_hex};
 use crate::systems::{with_world, Selected, UpdateNotes};
+use crate::tags::hexagon::Direction::{East, NorthEast, NorthWest, SouthEast, SouthWest, West};
 use crate::tags::hexagon::Hexagon;
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
 use gdnative::prelude::*;
 use legion::prelude::*;
+use priority_queue::PriorityQueue;
 use std::borrow::Borrow;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 #[derive(NativeClass)]
@@ -19,6 +22,7 @@ pub struct GameWorld {
     event_receiver: Receiver<Event>,
     node_entity: HashMap<u32, Ref<Node2D>>,
     selected_entity: Option<u32>,
+    current_path: Vec<Hexagon>,
 }
 
 #[methods]
@@ -33,6 +37,7 @@ impl GameWorld {
             event_receiver: receiver,
             node_entity: HashMap::new(),
             selected_entity: None,
+            current_path: Vec::new(),
         }
     }
 
@@ -94,18 +99,31 @@ impl GameWorld {
                 let node = world.get_component::<NodeComponent>(entity).unwrap();
                 self.node_entity.insert(entity.index(), node.node);
                 let node = unsafe { node.node.assume_safe() };
-                if node.is_connected("hex_clicked", owner, "hex_clicked") {
+                if !node.is_connected("hex_clicked", owner, "hex_clicked") {
+                    node.connect(
+                        "hex_clicked",
+                        owner,
+                        "hex_clicked",
+                        VariantArray::new_shared(),
+                        0,
+                    )
+                    .unwrap();
+                }
+
+                if !node.has_signal("hex_mouse_entered") {
                     return;
                 }
 
-                node.connect(
-                    "hex_clicked",
-                    owner,
-                    "hex_clicked",
-                    VariantArray::new_shared(),
-                    0,
-                )
-                .unwrap();
+                if !node.is_connected("hex_mouse_entered", owner, "hex_mouse_entered") {
+                    node.connect(
+                        "hex_mouse_entered",
+                        owner,
+                        "hex_mouse_entered",
+                        VariantArray::new_shared(),
+                        0,
+                    )
+                    .unwrap();
+                }
             });
         }
 
@@ -150,7 +168,74 @@ impl GameWorld {
     }
 
     #[export]
-    fn hex_clicked(&mut self, _owner: TRef<Node2D>, data: Variant) {
+    fn _draw(&self, owner: &Node2D) {
+        let mut last_point = None;
+        for hexagon in &self.current_path {
+            let current_point = get_2d_position_from_hex(&hexagon, self.process.hexfield_size);
+
+            match last_point {
+                None => {}
+                Some(point) => {
+                    owner.draw_line(point, current_point, Color::rgb(0.0, 0.0, 0.0), 1.0, false)
+                }
+            }
+
+            last_point = Some(current_point);
+        }
+    }
+
+    #[export]
+    fn hex_mouse_entered(&mut self, owner: TRef<Node2D>, data: Variant) {
+        let selected_entity_index = match self.selected_entity {
+            None => {
+                self.current_path = Vec::new();
+                owner.update();
+                return;
+            }
+            Some(index) => index,
+        };
+
+        let entity_index = data.try_to_u64().unwrap() as u32;
+        with_world(|world| {
+            let selected_entity = match Self::find_entity(selected_entity_index, world) {
+                None => {
+                    godot_error!("Entity with index {} not found", entity_index);
+                    return;
+                }
+                Some(entity) => entity,
+            };
+
+            let selected_hexagon = match world.get_tag::<Hexagon>(selected_entity) {
+                None => {
+                    godot_error!("Entity with index {} has no hexagon tag", entity_index);
+                    return;
+                }
+                Some(hexagon) => hexagon.clone(),
+            };
+
+            let mouse_entity = match Self::find_entity(entity_index, world) {
+                None => {
+                    godot_error!("Entity with index {} not found", entity_index);
+                    return;
+                }
+                Some(entity) => entity,
+            };
+
+            let mouse_hexagon = match world.get_tag::<Hexagon>(mouse_entity) {
+                None => {
+                    godot_error!("Entity has no hexagon tag");
+                    return;
+                }
+                Some(hexagon) => hexagon.clone(),
+            };
+
+            self.current_path = Self::find_path(&selected_hexagon, &mouse_hexagon, world);
+        });
+        owner.update();
+    }
+
+    #[export]
+    fn hex_clicked(&mut self, owner: TRef<Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_world(|world| {
             let self_entity = match Self::find_entity(entity_index, world) {
@@ -215,7 +300,7 @@ impl GameWorld {
                         match selected_entity {
                             None => {}
                             Some(selected_entity) => {
-                                if (selected_entity == clicked_entity) {
+                                if selected_entity == clicked_entity {
                                 } else {
                                     if world.has_component::<Unit>(clicked_entity) {
                                         if !world.has_component::<Unit>(selected_entity) {
@@ -266,6 +351,8 @@ impl GameWorld {
                 }
             }
         });
+        self.current_path = Vec::new();
+        owner.update();
     }
 
     #[export]
@@ -304,6 +391,70 @@ impl GameWorld {
             }
             CanMove::No => {}
         }
+    }
+
+    fn get_neighbours(hexagon: &Hexagon) -> Vec<Hexagon> {
+        vec![
+            hexagon.get_neighbour(East),
+            hexagon.get_neighbour(NorthEast),
+            hexagon.get_neighbour(NorthWest),
+            hexagon.get_neighbour(West),
+            hexagon.get_neighbour(SouthWest),
+            hexagon.get_neighbour(SouthEast),
+        ]
+    }
+
+    fn find_path(start: &Hexagon, target: &Hexagon, world: &World) -> Vec<Hexagon> {
+        for entity in Self::get_entities_at_hexagon(target, world) {
+            if world.has_component::<Unit>(entity) {
+                return Vec::new();
+            }
+        }
+
+        let mut frontier = PriorityQueue::new();
+        frontier.push(*start, Reverse(0));
+        let mut came_from = HashMap::new();
+        let mut cost_so_far = HashMap::new();
+        came_from.insert(*start, None);
+        cost_so_far.insert(*start, 0);
+        while !frontier.is_empty() {
+            let (current, _) = frontier.pop().unwrap();
+            if current == *target {
+                break;
+            }
+            for next in Self::get_neighbours(&current) {
+                if Self::get_entities_at_hexagon(&next, world)
+                    .iter()
+                    .any(|entity| world.has_component::<Unit>(*entity))
+                {
+                    continue;
+                }
+
+                let new_cost = cost_so_far[&current] + 1;
+                if !cost_so_far.contains_key(&next) || new_cost < cost_so_far[&next] {
+                    cost_so_far.insert(next.clone(), new_cost);
+                    let priority = new_cost + next.distance_to(target);
+                    frontier.push(next, Reverse(priority));
+                    came_from.insert(next, Some(current));
+                }
+            }
+        }
+
+        let mut path = Vec::new();
+
+        let mut current = match came_from[target] {
+            None => return Vec::new(),
+            Some(hexagon) => hexagon,
+        };
+
+        path.insert(0, *target);
+        while current != *start {
+            path.insert(0, current);
+            current = came_from[&current].unwrap();
+        }
+        path.insert(0, *start);
+
+        path
     }
 
     fn handle_attack_result(
