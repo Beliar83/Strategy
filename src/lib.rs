@@ -1,4 +1,5 @@
 mod components;
+mod game_state;
 mod gameworld;
 mod hexfield;
 mod systems;

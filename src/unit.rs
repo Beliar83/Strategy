@@ -1,5 +1,5 @@
 use crate::components::unit::Unit as UnitComponent;
-use crate::systems::{with_world, Selected};
+use crate::systems::{with_game_state, Selected};
 use gdnative::prelude::*;
 use legion::prelude::*;
 
@@ -35,14 +35,15 @@ impl Unit {
         };
 
         let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
-        with_world(|world| {
-            let entity = world
+        with_game_state(|state| {
+            let entity = state
+                .world
                 .iter_entities()
                 .find(|entity| entity.index() == self_entity_index);
             match entity {
                 None => {}
                 Some(entity) => {
-                    let unit = world.get_component::<UnitComponent>(entity);
+                    let unit = state.world.get_component::<UnitComponent>(entity);
                     match unit {
                         None => {}
                         Some(unit) => {
@@ -60,7 +61,7 @@ impl Unit {
                         }
                         Some(outline) => outline,
                     };
-                    let selected = world.get_tag::<Selected>(entity);
+                    let selected = state.world.get_tag::<Selected>(entity);
                     let visible = match selected {
                         None => false,
                         Some(selected) => selected.0,

@@ -1,5 +1,5 @@
 use crate::components::unit::{CanMove, Unit};
-use crate::systems::{with_world, Selected};
+use crate::systems::{with_game_state, Selected};
 use crate::tags::hexagon::Hexagon;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::{Area2D, Polygon2D};
@@ -92,9 +92,9 @@ impl HexField {
 
     fn is_selected_in_range(owner: TRef<Area2D>) -> bool {
         let mut can_move = CanMove::No;
-        with_world(|world| {
+        with_game_state(|state| {
             let query = <(Read<Unit>, Tagged<Hexagon>)>::query().filter(tag_value(&Selected(true)));
-            let selected_unit = query.iter(world).next();
+            let selected_unit = query.iter(&state.world).next();
             let (selected_unit, selected_hexagon) = match selected_unit {
                 None => {
                     return;
@@ -103,7 +103,8 @@ impl HexField {
             };
 
             let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
-            let self_entity = world
+            let self_entity = state
+                .world
                 .iter_entities()
                 .find(|entity| entity.index() == self_entity_index);
             let self_entity = match self_entity {
@@ -113,7 +114,7 @@ impl HexField {
                 Some(entity) => entity,
             };
 
-            let self_hexagon = match world.get_tag::<Hexagon>(self_entity) {
+            let self_hexagon = match state.world.get_tag::<Hexagon>(self_entity) {
                 None => {
                     return;
                 }

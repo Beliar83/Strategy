@@ -1,5 +1,6 @@
 pub mod dynamic_nodes;
 pub mod hexgrid;
+use crate::game_state::GameState;
 use dynamic_nodes::{create_nodes, update_nodes};
 use gdnative::prelude::*;
 use lazy_static::lazy_static;
@@ -7,13 +8,14 @@ use legion::prelude::*;
 use std::sync::Mutex;
 
 lazy_static! {
-    static ref WORLD: Mutex<World> = Mutex::new(Universe::new().create_world());
+    static ref GAMESTATE: Mutex<GameState> = Mutex::new(GameState::new());
 }
-pub fn with_world<F>(mut f: F)
+
+pub fn with_game_state<F>(mut f: F)
 where
-    F: FnMut(&mut World),
+    F: FnMut(&mut GameState),
 {
-    let _result = WORLD.try_lock().map(|mut world| f(&mut world));
+    let _result = GAMESTATE.try_lock().map(|mut state| f(&mut state));
 }
 
 pub struct Delta(pub f32);
@@ -61,12 +63,12 @@ impl UpdateNotes {
             .get_mut::<HexfieldSize>()
             .map(|mut d| d.0 = self.hexfield_size);
 
-        with_world(|world| {
-            create_nodes(world, root);
+        with_game_state(|state| {
+            create_nodes(&mut state.world, root);
         });
 
-        with_world(|mut world| {
-            self.schedule.execute(&mut world, &mut self.resources);
+        with_game_state(|state| {
+            self.schedule.execute(&mut state.world, &mut self.resources);
         })
     }
 }
