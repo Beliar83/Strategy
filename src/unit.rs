@@ -1,5 +1,6 @@
 use crate::components::unit::Unit as UnitComponent;
-use crate::systems::{with_game_state, Selected};
+use crate::game_state::State;
+use crate::systems::with_game_state;
 use gdnative::prelude::*;
 use legion::prelude::*;
 
@@ -61,10 +62,9 @@ impl Unit {
                         }
                         Some(outline) => outline,
                     };
-                    let selected = state.world.get_tag::<Selected>(entity);
-                    let visible = match selected {
-                        None => false,
-                        Some(selected) => selected.0,
+                    let visible = match state.state {
+                        State::Waiting => false,
+                        State::Selected(index) => index == self_entity_index,
                     };
                     outline.set_visible(visible);
                 }

@@ -1,5 +1,6 @@
 use crate::components::unit::{CanMove, Unit};
-use crate::systems::{with_game_state, Selected};
+use crate::game_state::State;
+use crate::systems::{find_entity, with_game_state};
 use crate::tags::hexagon::Hexagon;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::{Area2D, Polygon2D};
@@ -49,30 +50,7 @@ impl HexField {
     }
 
     #[export]
-    fn _ready(&self, owner: TRef<Area2D>) {
-        let parent = owner.get_parent();
-
-        let parent = match parent.and_then(|parent| unsafe { parent.assume_safe_if_sane() }) {
-            None => {
-                return;
-            }
-            Some(parent) => parent,
-        };
-
-        let result = parent.connect(
-            "entity_selected",
-            owner,
-            "entity_selected",
-            VariantArray::new_shared(),
-            0,
-        );
-
-        match result {
-            _ => {
-                return;
-            }
-        }
-    }
+    fn _ready(&self, owner: TRef<Area2D>) {}
 
     #[export]
     fn _process(&self, owner: TRef<Area2D>, _delta: f64) {
@@ -93,13 +71,26 @@ impl HexField {
     fn is_selected_in_range(owner: TRef<Area2D>) -> bool {
         let mut can_move = CanMove::No;
         with_game_state(|state| {
-            let query = <(Read<Unit>, Tagged<Hexagon>)>::query().filter(tag_value(&Selected(true)));
-            let selected_unit = query.iter(&state.world).next();
-            let (selected_unit, selected_hexagon) = match selected_unit {
-                None => {
-                    return;
+            let (selected_unit, selected_hexagon) = match state.state {
+                State::Waiting => return,
+                State::Selected(index) => {
+                    let entity = match find_entity(index, &state.world) {
+                        None => return,
+                        Some(entity) => entity,
+                    };
+
+                    let hexagon = match state.world.get_tag::<Hexagon>(entity) {
+                        None => return,
+                        Some(hexagon) => hexagon,
+                    };
+
+                    let unit = match state.world.get_component::<Unit>(entity) {
+                        None => return,
+                        Some(unit) => unit,
+                    };
+
+                    (unit, hexagon)
                 }
-                Some(selected) => selected,
             };
 
             let self_entity_index = owner.get_meta("Entity").to_u64() as u32;

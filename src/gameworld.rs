@@ -1,9 +1,9 @@
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
-use crate::game_state::GameState;
+use crate::game_state::State;
 use crate::systems::hexgrid::{create_grid, get_2d_position_from_hex};
-use crate::systems::{with_game_state, Selected, UpdateNotes};
+use crate::systems::{find_entity, with_game_state, UpdateNotes};
 use crate::tags::hexagon::Direction::{East, NorthEast, NorthWest, SouthEast, SouthWest, West};
 use crate::tags::hexagon::Hexagon;
 use crossbeam::channel::Receiver;
@@ -22,7 +22,6 @@ pub struct GameWorld {
     process: UpdateNotes,
     event_receiver: Receiver<Event>,
     node_entity: HashMap<u32, Ref<Node2D>>,
-    selected_entity: Option<u32>,
     current_path: Vec<Hexagon>,
 }
 
@@ -39,44 +38,11 @@ impl GameWorld {
             process: UpdateNotes::new(40),
             event_receiver: receiver,
             node_entity: HashMap::new(),
-            selected_entity: None,
             current_path: Vec::new(),
         }
     }
 
-    fn set_selected_entity(&mut self, entity: Option<&Entity>, world: &mut World) {
-        self.selected_entity = entity.and_then(|entity| Some(entity.index()));
-
-        let old_selected = <Read<NodeComponent>>::query()
-            .filter(tag_value(&Selected(true)))
-            .iter_entities(world)
-            .next()
-            .and_then(|data| Some(data.0));
-
-        match old_selected {
-            None => {}
-            Some(entity) => {
-                world
-                    .add_tag(entity, Selected(false))
-                    .expect("Could not add/updated selected tag to entity");
-            }
-        }
-
-        match entity {
-            None => self.selected_entity = None,
-            Some(entity) => {
-                world
-                    .add_tag(*entity, Selected(true))
-                    .expect("Could not add/updated selected tag to entity");
-            }
-        }
-    }
-
     fn register(builder: &ClassBuilder<Self>) {
-        builder.add_signal(Signal {
-            name: "entity_selected",
-            args: &[],
-        });
         builder
             .add_property("hexfield_size")
             .with_default(40)
@@ -195,18 +161,17 @@ impl GameWorld {
 
     #[export]
     fn hex_mouse_entered(&mut self, owner: TRef<Node2D>, data: Variant) {
-        let selected_entity_index = match self.selected_entity {
-            None => {
-                self.current_path = Vec::new();
-                owner.update();
-                return;
-            }
-            Some(index) => index,
-        };
-
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_game_state(|state| {
-            let selected_entity = match Self::find_entity(selected_entity_index, &state.world) {
+            let selected_entity_index = match state.state {
+                State::Waiting => {
+                    self.current_path = Vec::new();
+                    owner.update();
+                    return;
+                }
+                State::Selected(index) => index,
+            };
+            let selected_entity = match find_entity(selected_entity_index, &state.world) {
                 None => {
                     godot_error!("Entity with index {} not found", entity_index);
                     return;
@@ -222,7 +187,7 @@ impl GameWorld {
                 Some(hexagon) => hexagon.clone(),
             };
 
-            let mouse_entity = match Self::find_entity(entity_index, &state.world) {
+            let mouse_entity = match find_entity(entity_index, &state.world) {
                 None => {
                     godot_error!("Entity with index {} not found", entity_index);
                     return;
@@ -247,7 +212,7 @@ impl GameWorld {
     fn hex_clicked(&mut self, owner: TRef<Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_game_state(|state| {
-            let self_entity = match Self::find_entity(entity_index, &state.world) {
+            let self_entity = match find_entity(entity_index, &state.world) {
                 None => {
                     godot_error!("Entity with index {} not found", entity_index);
                     return;
@@ -287,21 +252,14 @@ impl GameWorld {
                 Some(entity) => entity,
             };
 
-            match self.selected_entity {
-                None => {
+            match state.state {
+                State::Waiting => {
                     if !state.world.has_component::<Unit>(clicked_entity) {
                         return;
                     }
-
-                    match state.world.add_tag(clicked_entity, Selected(true)) {
-                        Err(_) => {
-                            godot_error!("Could not add selected tag to entity.");
-                        }
-                        _ => {}
-                    }
-                    self.set_selected_entity(Some(&clicked_entity), &mut state.world);
+                    state.state = State::Selected(clicked_entity.index())
                 }
-                Some(selected_entity) => {
+                State::Selected(selected_entity) => {
                     {
                         let selected_entity = state
                             .world
@@ -358,7 +316,7 @@ impl GameWorld {
                                         );
                                     }
                                 }
-                                self.set_selected_entity(None, &mut state.world);
+                                state.state = State::Waiting;
                             }
                         }
                     };
@@ -496,39 +454,11 @@ impl GameWorld {
             .map(|data| data.0.clone())
             .collect()
     }
-
-    fn find_entity(entity_index: u32, world: &World) -> Option<Entity> {
-        world
-            .iter_entities()
-            .find(|entity| entity.index() == entity_index)
-            .clone()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn find_entity_returns_entity_with_index() {
-        let world = &mut Universe::new().create_world();
-        world.insert((), vec![(0,)]);
-        let check_entity_index = world.insert((), vec![(1,)]).first().unwrap().index();
-
-        let entity = GameWorld::find_entity(check_entity_index, world);
-        let entity = match entity {
-            None => panic!("Expected result with Some value"),
-            Some(x) => x,
-        };
-        assert_eq!(entity.index(), check_entity_index)
-    }
-
-    #[test]
-    fn find_entity_returns_none_if_entity_does_not_exist() {
-        let world = &Universe::new().create_world();
-        let entity = GameWorld::find_entity(0, world);
-        assert_eq!(entity, None);
-    }
 
     #[test]
     fn get_entities_at_hexagon_returns_all_entities_with_the_correct_tag_value() {

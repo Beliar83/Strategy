@@ -18,26 +18,16 @@ where
     let _result = GAMESTATE.try_lock().map(|mut state| f(&mut state));
 }
 
+pub fn find_entity(entity_index: u32, world: &World) -> Option<Entity> {
+    world
+        .iter_entities()
+        .find(|entity| entity.index() == entity_index)
+        .clone()
+}
+
 pub struct Delta(pub f32);
 
 pub struct HexfieldSize(pub i32);
-
-pub struct Selected(pub bool);
-
-unsafe impl Send for Selected {}
-unsafe impl Sync for Selected {}
-
-impl Clone for Selected {
-    fn clone(&self) -> Self {
-        Self(self.0)
-    }
-}
-
-impl PartialEq for Selected {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
 
 pub struct UpdateNotes {
     resources: Resources,
@@ -70,5 +60,30 @@ impl UpdateNotes {
         with_game_state(|state| {
             self.schedule.execute(&mut state.world, &mut self.resources);
         })
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn find_entity_returns_none_if_entity_does_not_exist() {
+        let world = &Universe::new().create_world();
+        let entity = find_entity(0, world);
+        assert_eq!(entity, None);
+    }
+
+    #[test]
+    fn find_entity_returns_entity_with_index() {
+        let world = &mut Universe::new().create_world();
+        world.insert((), vec![(0,)]);
+        let check_entity_index = world.insert((), vec![(1,)]).first().unwrap().index();
+
+        let entity = find_entity(check_entity_index, world);
+        let entity = match entity {
+            None => panic!("Expected result with Some value"),
+            Some(x) => x,
+        };
+        assert_eq!(entity.index(), check_entity_index)
     }
 }
