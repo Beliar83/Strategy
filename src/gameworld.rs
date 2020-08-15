@@ -2,28 +2,30 @@ use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::game_state::State;
-use crate::systems::hexgrid::{create_grid, get_2d_position_from_hex};
-use crate::systems::{find_entity, with_game_state, UpdateNotes};
-use crate::tags::hexagon::Direction::{East, NorthEast, NorthWest, SouthEast, SouthWest, West};
+use crate::systems::hexgrid::{
+    create_grid, find_path, get_2d_position_from_hex, get_entities_at_hexagon,
+};
+use crate::systems::{find_entity, with_game_state, UpdateNodes};
 use crate::tags::hexagon::Hexagon;
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
 use gdnative::prelude::*;
 use legion::prelude::*;
-use priority_queue::PriorityQueue;
 use std::borrow::Borrow;
-use std::cmp::Reverse;
+use std::collections::vec_deque::VecDeque;
 use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
 #[register_with(Self::register)]
 pub struct GameWorld {
-    process: UpdateNotes,
+    process: UpdateNodes,
     event_receiver: Receiver<Event>,
     node_entity: HashMap<u32, Ref<Node2D>>,
     current_path: Vec<Hexagon>,
 }
+
+const SECONDS_PER_MOVEMENT: f64 = 0.1f64;
 
 #[methods]
 impl GameWorld {
@@ -35,7 +37,7 @@ impl GameWorld {
                 .subscribe(sender.clone(), component::<NodeComponent>());
         });
         Self {
-            process: UpdateNotes::new(40),
+            process: UpdateNodes::new(40),
             event_receiver: receiver,
             node_entity: HashMap::new(),
             current_path: Vec::new(),
@@ -104,9 +106,9 @@ impl GameWorld {
             });
         }
 
-        with_game_state(|state| match state.state {
+        with_game_state(|state| match &state.state {
             State::Attacking(attacker, defender) => {
-                let attacker = match find_entity(attacker, &state.world) {
+                let attacker = match find_entity(*attacker, &state.world) {
                     None => {
                         godot_error!("ATTACKING: Attacking entity had invalid id: {}", attacker);
                         state.state = State::Waiting;
@@ -114,7 +116,7 @@ impl GameWorld {
                     }
                     Some(entity) => entity,
                 };
-                let defender = match find_entity(defender, &state.world) {
+                let defender = match find_entity(*defender, &state.world) {
                     None => {
                         godot_error!("ATTACKING: Defending entity had invalid id: {}", attacker);
                         state.state = State::Waiting;
@@ -164,22 +166,82 @@ impl GameWorld {
                 }
                 state.state = State::Waiting;
             }
+            State::Moving(entity, path, mut total_time) => {
+                let mut path = path.clone();
+                total_time += delta;
+                while total_time > SECONDS_PER_MOVEMENT {
+                    let entity = match find_entity(*entity, &state.world) {
+                        None => {
+                            godot_error!("MOVING: Entity to move had invalid id: {}", entity);
+                            state.state = State::Waiting;
+                            return;
+                        }
+                        Some(entity) => entity,
+                    };
+
+                    let unit = match state.world.get_component::<Unit>(entity) {
+                        None => {
+                            godot_error!(
+                                "MOVING: Entity to move has no unit component. Id: {}",
+                                entity.index()
+                            );
+                            state.state = State::Waiting;
+                            return;
+                        }
+                        Some(unit) => *unit,
+                    };
+
+                    if unit.remaining_range <= 0 {
+                        state.state = State::Waiting;
+                        return;
+                    }
+
+                    let hexagon = match state.world.get_tag::<Hexagon>(entity) {
+                        None => {
+                            godot_error!(
+                                "MOVING: Entity to move had no hexagon tag. Id: {}",
+                                entity.index()
+                            );
+                            state.state = State::Waiting;
+                            return;
+                        }
+                        Some(hexagon) => hexagon,
+                    };
+
+                    let next_hexagon = match path.pop_front() {
+                        None => {
+                            godot_warn!("MOVING: Path was empty");
+                            state.state = State::Waiting;
+                            return;
+                        }
+                        Some(hexagon) => hexagon,
+                    };
+
+                    if !hexagon.is_neighbour(&next_hexagon) {
+                        godot_error!(
+                            "MOVING: Next point in path was not adjacent to current hexagon"
+                        );
+                        state.state = State::Waiting;
+                        return;
+                    }
+
+                    Self::move_entity_to_hexagon(entity, &next_hexagon, &mut state.world);
+                    total_time -= SECONDS_PER_MOVEMENT;
+                }
+                if path.len() > 0 {
+                    state.state = State::Moving(*entity, path, total_time)
+                } else {
+                    state.state = State::Waiting;
+                }
+            }
             _ => {}
         });
     }
 
     #[export]
     pub fn _ready(&mut self, _owner: &Node2D) {
-        let size = 40;
-
         with_game_state(|state| {
-            create_grid(
-                4,
-                "res://HexField.tscn".to_owned(),
-                size,
-                1.0,
-                &mut state.world,
-            );
+            create_grid(4, "res://HexField.tscn".to_owned(), 1.0, &mut state.world);
             state.world.insert(
                 (Hexagon::new_axial(0, 0),),
                 vec![(
@@ -207,19 +269,38 @@ impl GameWorld {
 
     #[export]
     fn _draw(&self, owner: &Node2D) {
-        let mut last_point = None;
-        for hexagon in &self.current_path {
-            let current_point = get_2d_position_from_hex(&hexagon, self.process.hexfield_size);
+        with_game_state(|state| match state.state {
+            State::Selected(selected) => {
+                let selected_entity = match find_entity(selected, &state.world) {
+                    None => {
+                        return;
+                    }
+                    Some(entity) => entity,
+                };
 
-            match last_point {
-                None => {}
-                Some(point) => {
-                    owner.draw_line(point, current_point, Color::rgb(0.0, 0.0, 0.0), 1.0, false)
+                let mut last_point = match state.world.get_tag::<Hexagon>(selected_entity) {
+                    None => {
+                        return;
+                    }
+                    Some(hexagon) => get_2d_position_from_hex(hexagon, self.process.hexfield_size),
+                };
+                for hexagon in &self.current_path {
+                    let current_point =
+                        get_2d_position_from_hex(&hexagon, self.process.hexfield_size);
+
+                    owner.draw_line(
+                        last_point,
+                        current_point,
+                        Color::rgb(0.0, 0.0, 0.0),
+                        1.0,
+                        false,
+                    );
+
+                    last_point = current_point;
                 }
             }
-
-            last_point = Some(current_point);
-        }
+            _ => {}
+        })
     }
 
     #[export]
@@ -266,7 +347,7 @@ impl GameWorld {
                 Some(hexagon) => hexagon.clone(),
             };
 
-            self.current_path = Self::find_path(&selected_hexagon, &mouse_hexagon, &state.world);
+            self.current_path = find_path(&selected_hexagon, &mouse_hexagon, &state.world);
         });
         owner.update();
     }
@@ -291,7 +372,7 @@ impl GameWorld {
                 Some(hexagon) => hexagon.clone(),
             };
 
-            let entities_at_hexagon = Self::get_entities_at_hexagon(&clicked_hexagon, &state.world);
+            let entities_at_hexagon = get_entities_at_hexagon(&clicked_hexagon, &state.world);
 
             if entities_at_hexagon.len() == 0 {
                 godot_error!("No entities at clicked hexagon");
@@ -342,12 +423,36 @@ impl GameWorld {
                                             clicked_entity.index(),
                                         );
                                     } else {
-                                        // TODO: Make a "moving" state.
-                                        state.state = State::Waiting;
-                                        GameWorld::move_entity_to_hexagon(
-                                            selected_entity,
+                                        let selected_hexagon =
+                                            match state.world.get_tag::<Hexagon>(selected_entity) {
+                                                None => {
+                                                    godot_error!(
+                                                    "Selected entity has no hexagon tag. Id: {}",
+                                                    selected_entity.index()
+                                                );
+                                                    state.state = State::Waiting;
+                                                    return;
+                                                }
+                                                Some(hexagon) => hexagon,
+                                            };
+                                        let path = find_path(
+                                            selected_hexagon,
                                             &clicked_hexagon,
-                                            &mut state.world,
+                                            &state.world,
+                                        );
+
+                                        if path.len() < 1 {
+                                            godot_warn!(
+                                                "Path from entity to target not found. Id: {}",
+                                                selected_entity.index()
+                                            );
+                                            state.state = State::Waiting;
+                                            return;
+                                        }
+                                        state.state = State::Moving(
+                                            selected_entity.index(),
+                                            VecDeque::from(path),
+                                            0f64,
                                         );
                                     }
                                 }
@@ -400,70 +505,6 @@ impl GameWorld {
         }
     }
 
-    fn get_neighbours(hexagon: &Hexagon) -> Vec<Hexagon> {
-        vec![
-            hexagon.get_neighbour(East),
-            hexagon.get_neighbour(NorthEast),
-            hexagon.get_neighbour(NorthWest),
-            hexagon.get_neighbour(West),
-            hexagon.get_neighbour(SouthWest),
-            hexagon.get_neighbour(SouthEast),
-        ]
-    }
-
-    fn find_path(start: &Hexagon, target: &Hexagon, world: &World) -> Vec<Hexagon> {
-        for entity in Self::get_entities_at_hexagon(target, world) {
-            if world.has_component::<Unit>(entity) {
-                return Vec::new();
-            }
-        }
-
-        let mut frontier = PriorityQueue::new();
-        frontier.push(*start, Reverse(0));
-        let mut came_from = HashMap::new();
-        let mut cost_so_far = HashMap::new();
-        came_from.insert(*start, None);
-        cost_so_far.insert(*start, 0);
-        while !frontier.is_empty() {
-            let (current, _) = frontier.pop().unwrap();
-            if current == *target {
-                break;
-            }
-            for next in Self::get_neighbours(&current) {
-                if Self::get_entities_at_hexagon(&next, world)
-                    .iter()
-                    .any(|entity| world.has_component::<Unit>(*entity))
-                {
-                    continue;
-                }
-
-                let new_cost = cost_so_far[&current] + 1;
-                if !cost_so_far.contains_key(&next) || new_cost < cost_so_far[&next] {
-                    cost_so_far.insert(next.clone(), new_cost);
-                    let priority = new_cost + next.distance_to(target);
-                    frontier.push(next, Reverse(priority));
-                    came_from.insert(next, Some(current));
-                }
-            }
-        }
-
-        let mut path = Vec::new();
-
-        let mut current = match came_from[target] {
-            None => return Vec::new(),
-            Some(hexagon) => hexagon,
-        };
-
-        path.insert(0, *target);
-        while current != *start {
-            path.insert(0, current);
-            current = came_from[&current].unwrap();
-        }
-        path.insert(0, *start);
-
-        path
-    }
-
     fn handle_attack_result(
         world: &mut World,
         attacker: Entity,
@@ -482,32 +523,11 @@ impl GameWorld {
                 .expect("Could not update data of clicked unit");
         }
     }
-    fn get_entities_at_hexagon(hexagon: &Hexagon, world: &World) -> Vec<Entity> {
-        <Tagged<Hexagon>>::query()
-            .filter(tag_value(hexagon))
-            .iter_entities(world)
-            .map(|data| data.0.clone())
-            .collect()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn get_entities_at_hexagon_returns_all_entities_with_the_correct_tag_value() {
-        let world = &mut Universe::new().create_world();
-        world.insert((Hexagon::new_axial(0, 0),), vec![(0,)]);
-        world.insert((Hexagon::new_axial(1, 3),), vec![(0,), (0,)]);
-
-        let result = GameWorld::get_entities_at_hexagon(&Hexagon::new_axial(1, 3), world);
-        assert!(result.iter().all(|entity| {
-            let hexagon = world.get_tag::<Hexagon>(*entity).unwrap();
-            hexagon.get_q() == 1 && hexagon.get_r() == 3
-        }));
-        assert_eq!(result.len(), 2);
-    }
 
     #[test]
     fn handle_attack_result_updates_components() {

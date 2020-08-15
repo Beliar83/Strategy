@@ -29,13 +29,13 @@ pub struct Delta(pub f32);
 
 pub struct HexfieldSize(pub i32);
 
-pub struct UpdateNotes {
+pub struct UpdateNodes {
     resources: Resources,
     schedule: Schedule,
     pub hexfield_size: i32,
 }
 
-impl UpdateNotes {
+impl UpdateNodes {
     pub fn new(hexfield_size: i32) -> Self {
         let mut resources = Resources::default();
         resources.insert(HexfieldSize(hexfield_size));

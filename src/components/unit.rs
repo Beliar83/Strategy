@@ -1,5 +1,3 @@
-use legion::prelude::*;
-
 #[derive(Copy, Clone)]
 pub struct Unit {
     pub integrity: i32,
@@ -163,7 +161,7 @@ mod tests {
     #[test]
     pub fn can_move_returns_ok_with_remaining_distance_if_distance_is_below_or_equal_to_remaining_range(
     ) {
-        let mut unit = Unit::new(0, 0, 0, 0, 5, 0);
+        let unit = Unit::new(0, 0, 0, 0, 5, 0);
         let result = unit.can_move(4);
         match result {
             CanMove::Yes(remaining_range) => assert_eq!(remaining_range, 1),

@@ -1,5 +1,6 @@
 use crate::components::unit::{CanMove, Unit};
 use crate::game_state::State;
+use crate::systems::hexgrid::find_path;
 use crate::systems::{find_entity, with_game_state};
 use crate::tags::hexagon::Hexagon;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
@@ -12,26 +13,12 @@ use legion::prelude::*;
 #[register_with(Self::register_signals)]
 pub struct HexField {
     hovered: bool,
-    northwest: Option<Box<HexField>>,
-    northeast: Option<Box<HexField>>,
-    east: Option<Box<HexField>>,
-    southeast: Option<Box<HexField>>,
-    southwest: Option<Box<HexField>>,
-    west: Option<Box<HexField>>,
 }
 
 #[methods]
 impl HexField {
     pub fn new(_owner: &Area2D) -> Self {
-        HexField {
-            hovered: false,
-            northwest: None,
-            northeast: None,
-            east: None,
-            southeast: None,
-            southwest: None,
-            west: None,
-        }
+        HexField { hovered: false }
     }
 
     fn register_signals(builder: &ClassBuilder<Self>) {
@@ -50,19 +37,16 @@ impl HexField {
     }
 
     #[export]
-    fn _ready(&self, owner: TRef<Area2D>) {}
-
-    #[export]
     fn _process(&self, owner: TRef<Area2D>, _delta: f64) {
         let in_range = HexField::is_selected_in_range(owner);
         if self.hovered {
             if !in_range {
-                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.5));
+                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.75));
             } else {
                 HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 1.0));
             }
         } else if in_range {
-            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.5));
+            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.75));
         } else {
             HexField::set_field_color(owner, Color::rgb(1.0, 1.0, 1.0));
         }
@@ -94,10 +78,7 @@ impl HexField {
             };
 
             let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
-            let self_entity = state
-                .world
-                .iter_entities()
-                .find(|entity| entity.index() == self_entity_index);
+            let self_entity = find_entity(self_entity_index, &state.world);
             let self_entity = match self_entity {
                 None => {
                     return;
@@ -111,7 +92,8 @@ impl HexField {
                 }
                 Some(hexagon) => hexagon,
             };
-            let distance_to_selected = self_hexagon.distance_to(&selected_hexagon);
+            let distance_to_selected =
+                find_path(&selected_hexagon, self_hexagon, &state.world).len() as i32;
             can_move = selected_unit.can_move(distance_to_selected);
         });
         match can_move {
