@@ -63,8 +63,8 @@ impl Unit {
                         Some(outline) => outline,
                     };
                     let visible = match state.state {
-                        State::Waiting => false,
                         State::Selected(index) => index == self_entity_index,
+                        _ => false,
                     };
                     outline.set_visible(visible);
                 }

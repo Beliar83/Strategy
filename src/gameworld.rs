@@ -103,6 +103,69 @@ impl GameWorld {
                 }
             });
         }
+
+        with_game_state(|state| match state.state {
+            State::Attacking(attacker, defender) => {
+                let attacker = match find_entity(attacker, &state.world) {
+                    None => {
+                        godot_error!("ATTACKING: Attacking entity had invalid id: {}", attacker);
+                        state.state = State::Waiting;
+                        return;
+                    }
+                    Some(entity) => entity,
+                };
+                let defender = match find_entity(defender, &state.world) {
+                    None => {
+                        godot_error!("ATTACKING: Defending entity had invalid id: {}", attacker);
+                        state.state = State::Waiting;
+                        return;
+                    }
+                    Some(entity) => entity,
+                };
+                let attacking_unit = match state.world.get_component::<Unit>(attacker) {
+                    None => {
+                        godot_error!(
+                            "ATTACKING: Attacking entity had not unit component. Id: {}",
+                            attacker.index()
+                        );
+                        state.state = State::Waiting;
+                        return;
+                    }
+                    Some(unit) => *unit,
+                };
+
+                let defending_unit = match state.world.get_component::<Unit>(defender) {
+                    None => {
+                        godot_error!(
+                            "ATTACKING: Defending entity had not unit component. Id: {}",
+                            defender.index()
+                        );
+                        state.state = State::Waiting;
+                        return;
+                    }
+                    Some(unit) => *unit,
+                };
+                let result = { attacking_unit.attack(defending_unit.borrow()) };
+
+                match result {
+                    Ok(result) => {
+                        godot_print!("Damage dealt: {}", result.actual_damage);
+                        godot_print!("Remaining integrity: {}", result.defender.integrity);
+                        GameWorld::handle_attack_result(
+                            &mut state.world,
+                            attacker,
+                            defender,
+                            result,
+                        );
+                    }
+                    Err(error) => match error {
+                        AttackError::NoAttacksLeft => godot_print!("Attacker has no attacks left"),
+                    },
+                }
+                state.state = State::Waiting;
+            }
+            _ => {}
+        });
     }
 
     #[export]
@@ -164,12 +227,12 @@ impl GameWorld {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_game_state(|state| {
             let selected_entity_index = match state.state {
-                State::Waiting => {
+                State::Selected(index) => index,
+                _ => {
                     self.current_path = Vec::new();
                     owner.update();
                     return;
                 }
-                State::Selected(index) => index,
             };
             let selected_entity = match find_entity(selected_entity_index, &state.world) {
                 None => {
@@ -274,41 +337,13 @@ impl GameWorld {
                                         if !state.world.has_component::<Unit>(selected_entity) {
                                             return;
                                         }
-                                        let selected_unit = *state
-                                            .world
-                                            .get_component::<Unit>(selected_entity)
-                                            .unwrap();
-                                        let clicked_unit = *state
-                                            .world
-                                            .get_component::<Unit>(clicked_entity)
-                                            .unwrap();
-                                        let result =
-                                            { selected_unit.attack(clicked_unit.borrow()) };
-
-                                        match result {
-                                            Ok(result) => {
-                                                godot_print!(
-                                                    "Damage dealt: {}",
-                                                    result.actual_damage
-                                                );
-                                                godot_print!(
-                                                    "Remaining integrity: {}",
-                                                    result.defender.integrity
-                                                );
-                                                GameWorld::handle_attack_result(
-                                                    &mut state.world,
-                                                    selected_entity,
-                                                    clicked_entity,
-                                                    result,
-                                                );
-                                            }
-                                            Err(error) => match error {
-                                                AttackError::NoAttacksLeft => {
-                                                    godot_print!("Attacker has no attacks left")
-                                                }
-                                            },
-                                        }
+                                        state.state = State::Attacking(
+                                            selected_entity.index(),
+                                            clicked_entity.index(),
+                                        );
                                     } else {
+                                        // TODO: Make a "moving" state.
+                                        state.state = State::Waiting;
                                         GameWorld::move_entity_to_hexagon(
                                             selected_entity,
                                             &clicked_hexagon,
@@ -316,11 +351,11 @@ impl GameWorld {
                                         );
                                     }
                                 }
-                                state.state = State::Waiting;
                             }
                         }
                     };
                 }
+                _ => {}
             }
         });
         self.current_path = Vec::new();

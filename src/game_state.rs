@@ -17,4 +17,5 @@ impl GameState {
 pub enum State {
     Waiting,
     Selected(u32),
+    Attacking(u32, u32),
 }

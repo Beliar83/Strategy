@@ -72,7 +72,6 @@ impl HexField {
         let mut can_move = CanMove::No;
         with_game_state(|state| {
             let (selected_unit, selected_hexagon) = match state.state {
-                State::Waiting => return,
                 State::Selected(index) => {
                     let entity = match find_entity(index, &state.world) {
                         None => return,
@@ -91,6 +90,7 @@ impl HexField {
 
                     (unit, hexagon)
                 }
+                _ => return,
             };
 
             let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
