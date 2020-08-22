@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=2]
+[gd_scene load_steps=3 format=2]
 
 [ext_resource path="res://GameWorld.gdns" type="Script" id=1]
+[ext_resource path="res://map_ui.gdns" type="Script" id=2]
 
 [node name="Root" type="Node2D"]
 
@@ -11,17 +12,27 @@ current = true
 z_index = 1
 script = ExtResource( 1 )
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="UILayer" type="CanvasLayer" parent="."]
 
-[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
+[node name="UI" type="MarginContainer" parent="UILayer"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
+script = ExtResource( 2 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/MarginContainer"]
+[node name="Top" type="VBoxContainer" parent="UILayer/UI"]
+margin_right = 1024.0
+margin_bottom = 600.0
+mouse_filter = 2
+
+[node name="PlayerName" type="Label" parent="UILayer/UI/Top"]
+margin_right = 1024.0
+margin_bottom = 14.0
+
+[node name="Bottom" type="VBoxContainer" parent="UILayer/UI"]
 margin_right = 1024.0
 margin_bottom = 600.0
 mouse_filter = 2
@@ -30,7 +41,7 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="UILayer/UI/Bottom"]
 margin_top = 540.0
 margin_right = 1024.0
 margin_bottom = 600.0
@@ -40,7 +51,7 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer"]
+[node name="MarginContainer" type="MarginContainer" parent="UILayer/UI/Bottom/HBoxContainer"]
 margin_left = 908.0
 margin_right = 1024.0
 margin_bottom = 60.0
@@ -50,7 +61,7 @@ custom_constants/margin_top = 20
 custom_constants/margin_left = 20
 custom_constants/margin_bottom = 20
 
-[node name="Button" type="Button" parent="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/MarginContainer"]
+[node name="Button" type="Button" parent="UILayer/UI/Bottom/HBoxContainer/MarginContainer"]
 margin_left = 20.0
 margin_top = 20.0
 margin_right = 96.0
@@ -59,4 +70,4 @@ text = "End round"
 __meta__ = {
 "_edit_use_anchors_": false
 }
-[connection signal="pressed" from="CanvasLayer/MarginContainer/VBoxContainer/HBoxContainer/MarginContainer/Button" to="Camera2D/GameWorld" method="on_new_round"]
+[connection signal="pressed" from="UILayer/UI/Bottom/HBoxContainer/MarginContainer/Button" to="Camera2D/GameWorld" method="on_new_round"]

@@ -2,11 +2,13 @@ use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::game_state::State;
+use crate::player::Player;
 use crate::systems::hexgrid::{
     create_grid, find_path, get_2d_position_from_hex, get_entities_at_hexagon,
 };
 use crate::systems::{find_entity, with_game_state, UpdateNodes};
 use crate::tags::hexagon::Hexagon;
+use crate::tags::player::Player as PlayerTag;
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
 use gdnative::prelude::*;
@@ -242,8 +244,16 @@ impl GameWorld {
     pub fn _ready(&mut self, _owner: &Node2D) {
         with_game_state(|state| {
             create_grid(4, "res://HexField.tscn".to_owned(), 1.0, &mut state.world);
+            state.players.push(Player::new(
+                "Player 1".to_owned(),
+                Color::rgb(0f32, 0f32, 1f32),
+            ));
+            state.players.push(Player::new(
+                "Player 2".to_owned(),
+                Color::rgb(1f32, 0f32, 0f32),
+            ));
             state.world.insert(
-                (Hexagon::new_axial(0, 0),),
+                (Hexagon::new_axial(2, 0), PlayerTag(0)),
                 vec![(
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
@@ -254,7 +264,7 @@ impl GameWorld {
                 )],
             );
             state.world.insert(
-                (Hexagon::new_axial(0, 1),),
+                (Hexagon::new_axial(2, 1), PlayerTag(0)),
                 vec![(
                     NodeTemplate {
                         scene_file: "res://DummyUnit.tscn".to_owned(),
@@ -264,6 +274,31 @@ impl GameWorld {
                     Unit::new(10, 2, 1, 5, 5, 1),
                 )],
             );
+
+            state.world.insert(
+                (Hexagon::new_axial(-2, 0), PlayerTag(1)),
+                vec![(
+                    NodeTemplate {
+                        scene_file: "res://DummyUnit.tscn".to_owned(),
+                        scale_x: 1.0,
+                        scale_y: 1.0,
+                    },
+                    Unit::new(10, 2, 1, 5, 5, 1),
+                )],
+            );
+            state.world.insert(
+                (Hexagon::new_axial(-2, -1), PlayerTag(1)),
+                vec![(
+                    NodeTemplate {
+                        scene_file: "res://DummyUnit.tscn".to_owned(),
+                        scale_x: 1.0,
+                        scale_y: 1.0,
+                    },
+                    Unit::new(10, 2, 1, 5, 5, 1),
+                )],
+            );
+
+            state.current_player = Some(0);
         });
     }
 
@@ -322,6 +357,26 @@ impl GameWorld {
                 }
                 Some(entity) => entity,
             };
+
+            let current_player_index = match state.current_player {
+                None => {
+                    return;
+                }
+                Some(index) => index,
+            };
+
+            let selected_player_index =
+                match Self::get_player_of_entity(selected_entity, &state.world) {
+                    None => {
+                        godot_error!("Unit {} has no assigned player", selected_entity.index());
+                        return;
+                    }
+                    Some(index) => index,
+                };
+
+            if current_player_index != selected_player_index {
+                return;
+            }
 
             let selected_hexagon = match state.world.get_tag::<Hexagon>(selected_entity) {
                 None => {
@@ -418,11 +473,80 @@ impl GameWorld {
                                         if !state.world.has_component::<Unit>(selected_entity) {
                                             return;
                                         }
-                                        state.state = State::Attacking(
-                                            selected_entity.index(),
-                                            clicked_entity.index(),
-                                        );
+
+                                        let current_player_id = match state.current_player {
+                                            None => {
+                                                return;
+                                            }
+                                            Some(player) => player,
+                                        };
+
+                                        let selected_player_id =
+                                            match GameWorld::get_player_of_entity(
+                                                selected_entity,
+                                                &state.world,
+                                            ) {
+                                                None => {
+                                                    godot_error!(
+                                                        "Unit {} has no assigned player",
+                                                        selected_entity.index()
+                                                    );
+                                                    return;
+                                                }
+                                                Some(id) => id,
+                                            };
+
+                                        if current_player_id != selected_player_id {
+                                            state.state = State::Selected(clicked_entity.index());
+                                            return;
+                                        }
+
+                                        let clicked_player_id = match state
+                                            .world
+                                            .get_tag::<PlayerTag>(clicked_entity)
+                                        {
+                                            None => {
+                                                godot_error!(
+                                                    "Unit {} has no assigned player",
+                                                    clicked_entity.index()
+                                                );
+                                                return;
+                                            }
+                                            Some(player) => player.0,
+                                        };
+
+                                        if clicked_player_id != selected_player_id {
+                                            state.state = State::Attacking(
+                                                selected_entity.index(),
+                                                clicked_entity.index(),
+                                            );
+                                        }
                                     } else {
+                                        let current_player_id = match state.current_player {
+                                            None => {
+                                                return;
+                                            }
+                                            Some(player) => player,
+                                        };
+                                        let selected_player_id =
+                                            match GameWorld::get_player_of_entity(
+                                                selected_entity,
+                                                &state.world,
+                                            ) {
+                                                None => {
+                                                    godot_error!(
+                                                        "Unit {} has no assigned player",
+                                                        selected_entity.index()
+                                                    );
+                                                    return;
+                                                }
+                                                Some(id) => id,
+                                            };
+
+                                        if current_player_id != selected_player_id {
+                                            state.state = State::Waiting;
+                                            return;
+                                        }
                                         let selected_hexagon =
                                             match state.world.get_tag::<Hexagon>(selected_entity) {
                                                 None => {
@@ -467,6 +591,13 @@ impl GameWorld {
         owner.update();
     }
 
+    fn get_player_of_entity(entity: Entity, world: &World) -> Option<usize> {
+        match world.get_tag::<PlayerTag>(entity) {
+            None => None,
+            Some(player) => Some(player.0),
+        }
+    }
+
     #[export]
     pub fn on_new_round(&mut self, _owner: TRef<Node2D>) {
         with_game_state(|state| {
@@ -474,6 +605,18 @@ impl GameWorld {
                 unit.remaining_attacks = 1;
                 unit.remaining_range = unit.mobility;
             }
+            let next_player = match state.current_player {
+                None => 0,
+                Some(mut player) => {
+                    player += 1;
+                    if player >= state.players.len() {
+                        player = 0;
+                    }
+                    player
+                }
+            };
+            state.current_player = Some(next_player);
+            state.state = State::Waiting;
         });
     }
 
