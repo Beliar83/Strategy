@@ -37,7 +37,7 @@ impl HexField {
     }
 
     #[export]
-    fn _process(&self, owner: TRef<Area2D>, _delta: f64) {
+    fn _process(&self, owner: TRef<'_, Area2D>, _delta: f64) {
         let in_range = HexField::is_selected_in_range(owner);
         if self.hovered {
             if !in_range {
@@ -52,7 +52,7 @@ impl HexField {
         }
     }
 
-    fn is_selected_in_range(owner: TRef<Area2D>) -> bool {
+    fn is_selected_in_range(owner: TRef<'_, Area2D>) -> bool {
         let mut can_move = CanMove::No;
         with_game_state(|state| {
             let (selected_unit, selected_hexagon) = match state.state {
@@ -112,7 +112,7 @@ impl HexField {
     }
 
     #[export]
-    fn _on_field_mouse_exited(&mut self, owner: TRef<Area2D>) {
+    fn _on_field_mouse_exited(&mut self, owner: TRef<'_, Area2D>) {
         self.hovered = false;
         owner.emit_signal(
             "hex_mouse_exited",
@@ -120,7 +120,7 @@ impl HexField {
         );
     }
 
-    fn set_field_color(owner: TRef<Area2D>, color: Color) {
+    fn set_field_color(owner: TRef<'_, Area2D>, color: Color) {
         match owner
             .get_node("Field")
             .and_then(|field| unsafe { field.assume_safe_if_sane() })

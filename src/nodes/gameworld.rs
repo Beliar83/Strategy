@@ -56,7 +56,7 @@ impl GameWorld {
     }
 
     #[export]
-    pub fn _process(&mut self, owner: TRef<Node2D>, delta: f64) {
+    pub fn _process(&mut self, owner: TRef<'_, Node2D>, delta: f64) {
         self.process.execute(&owner, delta);
         let mut added_entities = Vec::new();
         let mut removed_entities = Vec::new();
@@ -339,7 +339,7 @@ impl GameWorld {
     }
 
     #[export]
-    fn hex_mouse_entered(&mut self, owner: TRef<Node2D>, data: Variant) {
+    fn hex_mouse_entered(&mut self, owner: TRef<'_, Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_game_state(|state| {
             let selected_entity_index = match state.state {
@@ -408,7 +408,7 @@ impl GameWorld {
     }
 
     #[export]
-    fn hex_clicked(&mut self, owner: TRef<Node2D>, data: Variant) {
+    fn hex_clicked(&mut self, owner: TRef<'_, Node2D>, data: Variant) {
         let entity_index = data.try_to_u64().unwrap() as u32;
         with_game_state(|state| {
             let self_entity = match find_entity(entity_index, &state.world) {
@@ -599,7 +599,7 @@ impl GameWorld {
     }
 
     #[export]
-    pub fn on_new_round(&mut self, _owner: TRef<Node2D>) {
+    pub fn on_new_round(&mut self, _owner: TRef<'_, Node2D>) {
         with_game_state(|state| {
             for mut unit in <Write<Unit>>::query().iter_mut(&mut state.world) {
                 unit.remaining_attacks = 1;

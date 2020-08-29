@@ -24,7 +24,7 @@ impl DummyUnit {
     }
 
     #[export]
-    fn _process(&self, owner: TRef<Node>, _delta: f64) {
+    fn _process(&self, owner: TRef<'_, Node>, _delta: f64) {
         let integrity_label = owner
             .get_node("Integrity")
             .and_then(|node| unsafe { node.assume_safe_if_sane() })

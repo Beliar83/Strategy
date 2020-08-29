@@ -12,7 +12,7 @@ impl MapUI {
     }
 
     #[export]
-    pub fn _process(&mut self, owner: TRef<Control>, _delta: f64) {
+    pub fn _process(&mut self, owner: TRef<'_, Control>, _delta: f64) {
         with_game_state(|state| {
             let player_name = match state.current_player {
                 None => "None".to_owned(),

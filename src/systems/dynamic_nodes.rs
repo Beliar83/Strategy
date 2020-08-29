@@ -67,6 +67,7 @@ pub fn load_scene(path: &str) -> Option<Ref<PackedScene, ThreadLocal>> {
     scene.cast::<PackedScene>()
 }
 
+#[allow(unused_qualifications)] //It is actually used/needed here, at least according to another rustc error.
 fn instance_scene<Root>(scene: &PackedScene) -> Result<Ref<Root, Unique>, ManageErrs>
 where
     Root: gdnative::GodotObject<RefKind = ManuallyManaged> + SubClass<Node>,
