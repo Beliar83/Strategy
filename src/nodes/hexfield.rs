@@ -38,22 +38,16 @@ impl HexField {
 
     #[export]
     fn _process(&self, owner: TRef<'_, Area2D>, _delta: f64) {
-        let in_range = HexField::is_selected_in_range(owner);
+        let highlight_value = HexField::calculate_highlight_value(owner);
         if self.hovered {
-            if !in_range {
-                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.75));
-            } else {
-                HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 1.0));
-            }
-        } else if in_range {
-            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, 0.75));
+            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, highlight_value + 0.5))
         } else {
-            HexField::set_field_color(owner, Color::rgb(1.0, 1.0, 1.0));
+            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, highlight_value + 0.25))
         }
     }
 
-    fn is_selected_in_range(owner: TRef<'_, Area2D>) -> bool {
-        let mut can_move = CanMove::No;
+    fn calculate_highlight_value(owner: TRef<'_, Area2D>) -> f32 {
+        let mut highlight_value = 0f32;
         with_game_state(|state| {
             let (selected_unit, selected_hexagon) = match state.state {
                 State::Selected(index) => {
@@ -94,12 +88,15 @@ impl HexField {
             };
             let distance_to_selected =
                 find_path(&selected_hexagon, self_hexagon, &state.world).len() as i32;
-            can_move = selected_unit.can_move(distance_to_selected);
+            match selected_unit.can_move(distance_to_selected) {
+                CanMove::Yes(_) => highlight_value += 0.25,
+                CanMove::No => {}
+            }
+            if selected_unit.can_attack(distance_to_selected) {
+                highlight_value += 0.25;
+            }
         });
-        match can_move {
-            CanMove::Yes(_) => true,
-            CanMove::No => false,
-        }
+        highlight_value
     }
 
     #[export]

@@ -260,7 +260,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5, 1),
+                    Unit::new(20, 5, 1, 1, 3, 5, 5, 1),
                 )],
             );
             state.world.insert(
@@ -271,7 +271,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5, 1),
+                    Unit::new(10, 10, 4, 2, 1, 5, 5, 1),
                 )],
             );
 
@@ -283,7 +283,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5, 1),
+                    Unit::new(20, 5, 1, 1, 3, 5, 5, 1),
                 )],
             );
             state.world.insert(
@@ -294,7 +294,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 2, 1, 5, 5, 1),
+                    Unit::new(10, 10, 4, 2, 1, 5, 5, 1),
                 )],
             );
 
@@ -470,7 +470,33 @@ impl GameWorld {
                                 if selected_entity == clicked_entity {
                                 } else {
                                     if state.world.has_component::<Unit>(clicked_entity) {
-                                        if !state.world.has_component::<Unit>(selected_entity) {
+                                        let selected_unit = match state
+                                            .world
+                                            .get_component::<Unit>(selected_entity)
+                                        {
+                                            None => {
+                                                return;
+                                            }
+                                            Some(unit) => unit,
+                                        };
+
+                                        let selected_hexagon =
+                                            match state.world.get_tag::<Hexagon>(selected_entity) {
+                                                None => {
+                                                    godot_error!(
+                                                    "Selected entity has no hexagon tag. Id: {}",
+                                                    selected_entity.index()
+                                                );
+                                                    state.state = State::Waiting;
+                                                    return;
+                                                }
+                                                Some(hexagon) => hexagon,
+                                            };
+
+                                        let distance =
+                                            selected_hexagon.distance_to(&clicked_hexagon);
+
+                                        if !selected_unit.can_attack(distance) {
                                             return;
                                         }
 
@@ -631,6 +657,8 @@ impl GameWorld {
                 let updated_selected_unit = Unit::new(
                     selected_unit.integrity,
                     selected_unit.damage,
+                    selected_unit.max_attack_range,
+                    selected_unit.min_attack_range,
                     selected_unit.armor,
                     selected_unit.mobility,
                     remaining_range,
@@ -676,18 +704,18 @@ mod tests {
     fn handle_attack_result_updates_components() {
         let world = &mut Universe::new().create_world();
         let attacker = world
-            .insert((), vec![(Unit::new(1, 1, 0, 0, 0, 1),)])
+            .insert((), vec![(Unit::new(1, 1, 0, 0, 0, 0, 0, 1),)])
             .first()
             .unwrap()
             .clone();
         let defender = world
-            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0),)])
+            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
             .first()
             .unwrap()
             .clone();
         let result = AttackResult {
-            attacker: Unit::new(1, 1, 0, 0, 0, 0),
-            defender: Unit::new(1, 1, 0, 0, 0, 0),
+            attacker: Unit::new(1, 1, 0, 0, 0, 0, 0, 0),
+            defender: Unit::new(1, 1, 0, 0, 0, 0, 0, 0),
             actual_damage: 1,
         };
 
@@ -703,18 +731,18 @@ mod tests {
     fn handle_attack_result_removes_defender_when_integrity_lower_or_eq_0() {
         let world = &mut Universe::new().create_world();
         let attacker = world
-            .insert((), vec![(Unit::new(1, 2, 0, 0, 0, 1),)])
+            .insert((), vec![(Unit::new(1, 2, 0, 0, 0, 0, 0, 1),)])
             .first()
             .unwrap()
             .clone();
         let defender = world
-            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0),)])
+            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
             .first()
             .unwrap()
             .clone();
         let result = AttackResult {
-            attacker: Unit::new(1, 1, 0, 0, 0, 0),
-            defender: Unit::new(0, 1, 0, 0, 0, 0),
+            attacker: Unit::new(1, 1, 0, 0, 0, 0, 0, 0),
+            defender: Unit::new(0, 1, 0, 0, 0, 0, 0, 0),
             actual_damage: 1,
         };
 
@@ -724,12 +752,62 @@ mod tests {
     }
 
     #[test]
+    fn handle_attack_results_only_changes_affected_fields() {
+        let world = &mut Universe::new().create_world();
+        let attacking_unit = Unit::new(1, 1, 2, 4, 5, 3, 0, 1);
+        let attacker = world
+            .insert((), vec![(attacking_unit,)])
+            .first()
+            .unwrap()
+            .clone();
+        let defending_unit = Unit::new(2, 4, 5, 3, 2, 4, 0, 0);
+        let defender = world
+            .insert((), vec![(defending_unit,)])
+            .first()
+            .unwrap()
+            .clone();
+        let result = AttackResult {
+            attacker: attacking_unit,
+            defender: defending_unit,
+            actual_damage: 1,
+        };
+
+        GameWorld::handle_attack_result(world, attacker, defender, result);
+
+        let changed_attacker = world.get_component::<Unit>(attacker).unwrap();
+        assert_eq!(changed_attacker.damage, attacking_unit.damage);
+        assert_eq!(
+            changed_attacker.max_attack_range,
+            attacking_unit.max_attack_range
+        );
+        assert_eq!(
+            changed_attacker.min_attack_range,
+            attacking_unit.min_attack_range
+        );
+        assert_eq!(changed_attacker.armor, attacking_unit.armor);
+        assert_eq!(changed_attacker.mobility, attacking_unit.mobility);
+
+        let changed_defender = world.get_component::<Unit>(defender).unwrap();
+        assert_eq!(changed_defender.damage, defending_unit.damage);
+        assert_eq!(
+            changed_defender.max_attack_range,
+            defending_unit.max_attack_range
+        );
+        assert_eq!(
+            changed_defender.min_attack_range,
+            defending_unit.min_attack_range
+        );
+        assert_eq!(changed_defender.armor, defending_unit.armor);
+        assert_eq!(changed_defender.mobility, defending_unit.mobility);
+    }
+
+    #[test]
     fn move_entity_to_hexagon_updates_entity() {
         let world = &mut Universe::new().create_world();
         let entity = world
             .insert(
                 (Hexagon::new_axial(0, 0),),
-                vec![(Unit::new(0, 0, 0, 0, 2, 0),)],
+                vec![(Unit::new(0, 0, 0, 0, 0, 0, 2, 0),)],
             )
             .first()
             .unwrap()
@@ -748,7 +826,7 @@ mod tests {
         let entity = *world
             .insert(
                 (Hexagon::new_axial(5, 5),),
-                vec![(Unit::new(0, 0, 0, 0, 1, 0),)],
+                vec![(Unit::new(0, 0, 0, 0, 0, 0, 1, 0),)],
             )
             .first()
             .unwrap();
