@@ -8,6 +8,7 @@ pub struct GameState {
     pub state: State,
     pub players: Vec<Player>,
     pub current_player: Option<usize>,
+    pub current_path: Vec<Hexagon>,
 }
 
 impl GameState {
@@ -17,6 +18,7 @@ impl GameState {
             state: State::Waiting,
             players: Vec::new(),
             current_player: None,
+            current_path: Vec::new(),
         }
     }
 

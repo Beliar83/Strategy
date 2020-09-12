@@ -1,9 +1,11 @@
 use crate::components::unit::{CanMove, Unit};
 use crate::game_state::State;
+use crate::nodes::gameworld::GameWorld;
 use crate::systems::hexgrid::find_path;
 use crate::systems::{find_entity, with_game_state};
 use crate::tags::hexagon::Hexagon;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
+use gdnative::api::GlobalConstants;
 use gdnative::api::{Area2D, Polygon2D};
 use gdnative::prelude::*;
 use legion::prelude::*;
@@ -23,7 +25,11 @@ impl HexField {
 
     fn register_signals(builder: &ClassBuilder<Self>) {
         builder.add_signal(Signal {
-            name: "hex_clicked",
+            name: "hex_left_clicked",
+            args: &[],
+        });
+        builder.add_signal(Signal {
+            name: "hex_right_clicked",
             args: &[],
         });
         builder.add_signal(Signal {
@@ -143,13 +149,21 @@ impl HexField {
             Some(event) => event,
         };
 
-        if !unsafe { event.assume_safe() }.is_pressed() {
+        let event = unsafe { event.assume_safe() };
+        if !event.is_pressed() {
             return;
         }
 
-        owner.emit_signal(
-            "hex_clicked",
-            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
-        );
+        if event.button_index() == GlobalConstants::BUTTON_RIGHT {
+            owner.emit_signal(
+                "hex_right_clicked",
+                &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+            );
+        } else if event.button_index() == GlobalConstants::BUTTON_LEFT {
+            owner.emit_signal(
+                "hex_left_clicked",
+                &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+            );
+        }
     }
 }
