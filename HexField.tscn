@@ -8,8 +8,15 @@ script = ExtResource( 40 )
 [node name="Field" type="Polygon2D" parent="."]
 polygon = PoolVector2Array( -35, 20, -35, -20, 0, -40, 35, -20, 35, 20, 0, 40, -35, 20 )
 
+[node name="HighlightColour" type="Polygon2D" parent="Field"]
+polygon = PoolVector2Array( -35, 20, -35, -20, 0, -40, 35, -20, 35, 20, 0, 40, -35, 20 )
+
+[node name="FieldColour" type="Polygon2D" parent="Field"]
+color = Color( 0, 0, 0, 0 )
+polygon = PoolVector2Array( -35, 20, -35, -20, 0, -40, 35, -20, 35, 20, 0, 40, -35, 20 )
+
 [node name="Collision" type="CollisionPolygon2D" parent="."]
-polygon = PoolVector2Array( -34.5, 19.5, -34.5, -19.5, 0.0, -39.5, 34.5, -19.5, 34.5, 19.5, 0.0, 39.5 )
+polygon = PoolVector2Array( -34.5, 19.5, -34.5, -19.5, 0, -39.5, 34.5, -19.5, 34.5, 19.5, 0, 39.5 )
 
 [node name="Outline" type="Line2D" parent="."]
 points = PoolVector2Array( -35, 20, -35, -20, 0, -40, 35, -20, 35, 20, 0, 40, -35, 20 )

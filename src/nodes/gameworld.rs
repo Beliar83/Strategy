@@ -309,7 +309,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 10, 4, 2, 1, 5, 5, 1),
+                    Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
                 )],
             );
 
@@ -332,7 +332,7 @@ impl GameWorld {
                         scale_x: 1.0,
                         scale_y: 1.0,
                     },
-                    Unit::new(10, 10, 4, 2, 1, 5, 5, 1),
+                    Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
                 )],
             );
 

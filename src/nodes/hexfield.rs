@@ -1,8 +1,9 @@
 use crate::components::unit::{CanMove, Unit};
 use crate::game_state::State;
-use crate::systems::hexgrid::find_path;
+use crate::systems::hexgrid::{find_path, get_entities_at_hexagon};
 use crate::systems::{find_entity, with_game_state};
 use crate::tags::hexagon::Hexagon;
+use crate::tags::player::Player;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::GlobalConstants;
 use gdnative::api::{Area2D, Polygon2D};
@@ -43,18 +44,19 @@ impl HexField {
 
     #[export]
     fn _process(&self, owner: TRef<'_, Area2D>, _delta: f64) {
-        let highlight_value = HexField::calculate_highlight_value(owner);
-        if self.hovered {
-            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, highlight_value + 0.5))
+        let field_colour = HexField::calculate_field_colour(owner);
+        if !self.hovered {
+            Self::set_highlight_colour(owner, Color::rgba(0f32, 0f32, 0f32, 0.25))
         } else {
-            HexField::set_field_color(owner, Color::rgb(0.0, 0.0, highlight_value + 0.25))
+            Self::set_highlight_colour(owner, Color::rgba(0f32, 0f32, 0f32, 0f32))
         }
+        HexField::set_field_color(owner, field_colour);
     }
 
-    fn calculate_highlight_value(owner: TRef<'_, Area2D>) -> f32 {
-        let mut highlight_value = 0f32;
+    fn calculate_field_colour(owner: TRef<'_, Area2D>) -> Color {
+        let mut colour = Color::rgba(0f32, 0f32, 0f32, 0f32);
         with_game_state(|state| {
-            let (selected_unit, selected_hexagon) = match state.state {
+            let (selected_unit, selected_hexagon, select_unit_player) = match state.state {
                 State::Selected(index) => {
                     let entity = match find_entity(index, &state.world) {
                         None => return,
@@ -71,7 +73,12 @@ impl HexField {
                         Some(unit) => unit,
                     };
 
-                    (unit, hexagon)
+                    let player = match state.world.get_tag::<Player>(entity) {
+                        None => return,
+                        Some(player) => player,
+                    };
+
+                    (unit, hexagon, player)
                 }
                 _ => return,
             };
@@ -91,17 +98,38 @@ impl HexField {
                 }
                 Some(hexagon) => hexagon,
             };
-            let distance_to_selected =
-                find_path(&selected_hexagon, self_hexagon, &state.world).len() as i32;
-            match selected_unit.can_move(distance_to_selected) {
-                CanMove::Yes(_) => highlight_value += 0.25,
+            match selected_unit
+                .can_move(find_path(&selected_hexagon, self_hexagon, &state.world).len() as i32)
+            {
+                CanMove::Yes(_) => {
+                    colour.b = 1f32;
+                    colour.a = 0.25f32;
+                }
                 CanMove::No => {}
             }
-            if selected_unit.can_attack(distance_to_selected) {
-                highlight_value += 0.25;
+
+            if selected_unit.can_attack(selected_hexagon.distance_to(self_hexagon)) {
+                let entities_on_field = get_entities_at_hexagon(self_hexagon, &state.world);
+                let entity_of_unit_on_field = entities_on_field
+                    .iter()
+                    .find(|entity| state.world.has_component::<Unit>(**entity));
+                let mut same_player = false;
+                match entity_of_unit_on_field {
+                    None => {}
+                    Some(entity) => match state.world.get_tag::<Player>(*entity) {
+                        None => {}
+                        Some(player) => {
+                            same_player = player == select_unit_player;
+                        }
+                    },
+                }
+                if !same_player {
+                    colour.r = 1f32;
+                    colour.a = 0.25f32;
+                }
             }
         });
-        highlight_value
+        colour
     }
 
     #[export]
@@ -124,12 +152,27 @@ impl HexField {
 
     fn set_field_color(owner: TRef<'_, Area2D>, color: Color) {
         match owner
-            .get_node("Field")
+            .get_node("Field/FieldColour")
             .and_then(|field| unsafe { field.assume_safe_if_sane() })
             .and_then(|field| field.cast::<Polygon2D>())
         {
             Some(field) => field.set_color(color),
-            None => godot_error!("HexField has no \"Field\" child or it is not a Polygon2D"),
+            None => {
+                godot_error!("HexField has no \"Field/FieldColour\" child or it is not a Polygon2D")
+            }
+        };
+    }
+
+    fn set_highlight_colour(owner: TRef<'_, Area2D>, color: Color) {
+        match owner
+            .get_node("Field/HighlightColour")
+            .and_then(|field| unsafe { field.assume_safe_if_sane() })
+            .and_then(|field| field.cast::<Polygon2D>())
+        {
+            Some(field) => field.set_color(color),
+            None => godot_error!(
+                "HexField has no \"Field/HighlightColour\" child or it is not a Polygon2D"
+            ),
         };
     }
 
