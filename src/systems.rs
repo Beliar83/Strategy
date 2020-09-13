@@ -22,10 +22,7 @@ pub fn find_entity(entity_index: u32, world: &World) -> Option<Entity> {
     world
         .iter_entities()
         .find(|entity| entity.index() == entity_index)
-        .clone()
 }
-
-pub struct Delta(pub f32);
 
 pub struct HexfieldSize(pub i32);
 
@@ -49,9 +46,9 @@ impl UpdateNodes {
     }
 
     pub fn execute(&mut self, root: &Node2D, _delta: f64) {
-        self.resources
-            .get_mut::<HexfieldSize>()
-            .map(|mut d| d.0 = self.hexfield_size);
+        if let Some(mut d) = self.resources.get_mut::<HexfieldSize>() {
+            d.0 = self.hexfield_size
+        }
 
         with_game_state(|state| {
             create_nodes(&mut state.world, root);

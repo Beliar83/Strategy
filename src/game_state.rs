@@ -21,11 +21,6 @@ impl GameState {
             current_path: Vec::new(),
         }
     }
-
-    pub fn add_player(&mut self, player: Player) -> usize {
-        self.players.push(player);
-        self.players.len()
-    }
 }
 
 pub enum State {

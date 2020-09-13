@@ -1,20 +1,12 @@
 use std::hash::Hash;
 
 /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Hexagon {
     q: i32,
     r: i32,
     s: i32,
 }
-
-impl PartialEq for Hexagon {
-    fn eq(&self, other: &Self) -> bool {
-        self.q.eq(&other.q) && self.r.eq(&other.r) && self.s.eq(&other.s)
-    }
-}
-
-impl Eq for Hexagon {}
 
 impl Hexagon {
     pub fn zero() -> Self {
@@ -24,12 +16,11 @@ impl Hexagon {
     /// Creates a position from axial coordinates
     pub fn new_axial(q: i32, r: i32) -> Self {
         // https://www.redblobgames.com/grids/hexagons/#conversions-axial
-        let hexagon = Hexagon {
+        Hexagon {
             q,
             r,
             s: calculate_axis(q, r),
-        };
-        hexagon
+        }
     }
 
     pub fn move_q(&self, length: i32) -> Hexagon {

@@ -1,6 +1,5 @@
 use crate::components::unit::{CanMove, Unit};
 use crate::game_state::State;
-use crate::nodes::gameworld::GameWorld;
 use crate::systems::hexgrid::find_path;
 use crate::systems::{find_entity, with_game_state};
 use crate::tags::hexagon::Hexagon;

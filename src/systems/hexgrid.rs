@@ -34,7 +34,7 @@ pub fn get_2d_position_from_hex(hex: &Hexagon, hexfield_size: i32) -> Vector2 {
     let x = hexfield_size as f32
         * (3.0_f32.sqrt() * (hex.get_q() as f32) + 3.0_f32.sqrt() / 2.0 * (hex.get_r() as f32));
     let y = hexfield_size as f32 * (3.0 / 2.0 * (hex.get_r() as f32));
-    return Vector2::new(x, y);
+    Vector2::new(x, y)
 }
 
 pub fn get_neighbours(hexagon: &Hexagon) -> Vec<Hexagon> {
@@ -52,7 +52,7 @@ pub fn get_entities_at_hexagon(hexagon: &Hexagon, world: &World) -> Vec<Entity> 
     <Tagged<Hexagon>>::query()
         .filter(tag_value(hexagon))
         .iter_entities(world)
-        .map(|data| data.0.clone())
+        .map(|data| data.0)
         .collect()
 }
 
@@ -84,7 +84,7 @@ pub fn find_path(start: &Hexagon, target: &Hexagon, world: &World) -> Vec<Hexago
 
             let new_cost = cost_so_far[&current] + 1;
             if !cost_so_far.contains_key(&next) || new_cost < cost_so_far[&next] {
-                cost_so_far.insert(next.clone(), new_cost);
+                cost_so_far.insert(next, new_cost);
                 let priority = new_cost + next.distance_to(target);
                 frontier.push(next, Reverse(priority));
                 came_from.insert(next, Some(current));
@@ -112,6 +112,7 @@ pub fn find_path(start: &Hexagon, target: &Hexagon, world: &World) -> Vec<Hexago
 mod tests {
     use super::*;
 
+    //noinspection DuplicatedCode
     #[test]
     fn create_grid_creates_grid_of_correct_size() {
         let world: &mut World = &mut Universe::new().create_world();
@@ -121,9 +122,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == 0
                 && position_data.get_r() == 0
                 && position_data.get_s() == 0
@@ -132,9 +134,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == 1
                 && position_data.get_r() == 0
                 && position_data.get_s() == -1
@@ -143,9 +146,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == 0
                 && position_data.get_r() == 1
                 && position_data.get_s() == -1
@@ -154,9 +158,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == 0
                 && position_data.get_r() == -1
                 && position_data.get_s() == 1
@@ -165,9 +170,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == -1
                 && position_data.get_r() == 0
                 && position_data.get_s() == 1
@@ -176,9 +182,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == -1
                 && position_data.get_r() == 1
                 && position_data.get_s() == 0
@@ -187,9 +194,10 @@ mod tests {
         let result = world.iter_entities().any(|entity| {
             let position_data = world.get_tag::<Hexagon>(entity).unwrap();
             let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+            let error = 0.1;
             node_data.scene_file == "test"
-                && node_data.scale_x == 1.5
-                && node_data.scale_y == 1.5
+                && (node_data.scale_x - 1.5).abs() < error
+                && (node_data.scale_y - 1.5).abs() < error
                 && position_data.get_q() == 1
                 && position_data.get_r() == -1
                 && position_data.get_s() == 0
