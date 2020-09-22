@@ -231,7 +231,7 @@ impl GameWorld {
                     };
 
                     if unit.remaining_range <= 0 {
-                        Self::reset_state(state);
+                        state.state = State::Selected(entity.index());
                         return;
                     }
 
@@ -250,7 +250,7 @@ impl GameWorld {
                     let next_hexagon = match path.pop_front() {
                         None => {
                             godot_warn!("MOVING: Path was empty");
-                            Self::reset_state(state);
+                            state.state = State::Selected(entity.index());
                             return;
                         }
                         Some(hexagon) => hexagon,
@@ -260,7 +260,7 @@ impl GameWorld {
                         godot_error!(
                             "MOVING: Next point in path was not adjacent to current hexagon"
                         );
-                        Self::reset_state(state);
+                        state.state = State::Selected(entity.index());
                         return;
                     }
 
@@ -270,7 +270,7 @@ impl GameWorld {
                 if !path.is_empty() {
                     state.state = State::Moving(*entity, path, total_time)
                 } else {
-                    Self::reset_state(state);
+                    state.state = State::Selected(*entity);
                 }
             }
             _ => {}
