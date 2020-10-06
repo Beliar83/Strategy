@@ -1,5 +1,7 @@
+use crate::components::hexagon::Hexagon;
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
+use crate::components::player::Player as PlayerComponent;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::game_state::GameState;
 use crate::game_state::State;
@@ -7,15 +9,15 @@ use crate::player::Player;
 use crate::systems::hexgrid::{
     create_grid, find_path, get_2d_position_from_hex, get_entities_at_hexagon,
 };
-use crate::systems::{find_entity, with_game_state, UpdateNodes};
-use crate::tags::hexagon::Hexagon;
-use crate::tags::player::Player as PlayerTag;
+use crate::systems::{find_entity_of_instance, with_game_state, UpdateNodes};
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::GlobalConstants;
 use gdnative::prelude::*;
-use legion::prelude::*;
+use legion::query::Query;
+use legion::world::{ComponentError, EntityAccessError, Entry, Event, StorageAccessor};
+use legion::{component, Entity, EntityStore, IntoQuery, World, Write};
 use std::borrow::Borrow;
 use std::collections::vec_deque::VecDeque;
 use std::collections::HashMap;
@@ -26,8 +28,8 @@ use std::collections::HashMap;
 pub struct GameWorld {
     process: UpdateNodes,
     event_receiver: Receiver<Event>,
-    node_entity: HashMap<u32, Ref<Node2D>>,
-    current_mouse_entity: Option<u32>,
+    node_entity: HashMap<Entity, Ref<Node2D>>,
+    current_mouse_instance: Option<i64>,
 }
 
 const SECONDS_PER_MOVEMENT: f64 = 0.1f64;
@@ -45,7 +47,7 @@ impl GameWorld {
             process: UpdateNodes::new(40),
             event_receiver: receiver,
             node_entity: HashMap::new(),
-            current_mouse_entity: None,
+            current_mouse_instance: None,
         }
     }
 
@@ -72,8 +74,9 @@ impl GameWorld {
         }
         for entity in added_entities {
             with_game_state(|state| {
-                let node = state.world.get_component::<NodeComponent>(entity).unwrap();
-                self.node_entity.insert(entity.index(), node.node);
+                let entry = state.world.entry(entity).unwrap();
+                let node = entry.get_component::<NodeComponent>().unwrap();
+                self.node_entity.insert(entity, node.node);
                 let node = unsafe { node.node.assume_safe() };
                 if node.has_signal("hex_left_clicked")
                     && !node.is_connected("hex_left_clicked", owner, "hex_left_clicked")
@@ -130,57 +133,47 @@ impl GameWorld {
         }
 
         for entity in removed_entities {
-            with_game_state(|state| {
-                if !state.world.has_component::<NodeComponent>(entity) {
-                    unsafe { self.node_entity[&entity.index()].assume_safe() }.queue_free();
-                }
-            });
+            unsafe { self.node_entity[&entity].assume_safe() }.queue_free();
         }
 
         with_game_state(|state| match &state.state {
-            State::Attacking(attacker, defender) => {
-                let attacker = match find_entity(*attacker, &state.world) {
-                    None => {
-                        godot_error!("ATTACKING: Attacking entity had invalid id: {}", attacker);
-                        Self::reset_state(state);
-                        return;
-                    }
-                    Some(entity) => entity,
-                };
-                let defender = match find_entity(*defender, &state.world) {
-                    None => {
-                        godot_error!("ATTACKING: Defending entity had invalid id: {}", attacker);
-                        Self::reset_state(state);
-                        return;
-                    }
-                    Some(entity) => entity,
-                };
+            State::Attacking(attacker_entity, defender_entity) => {
                 let attacking_unit = {
-                    let attacking_unit = state.world.get_component::<Unit>(attacker);
-                    match attacking_unit {
+                    let attacker_entry = match state.world.entry(*attacker_entity) {
                         None => {
-                            godot_error!(
-                                "ATTACKING: Attacking entity had not unit component. Id: {}",
-                                attacker.index()
-                            );
-                            drop(attacking_unit);
+                            godot_error!("ATTACKING: Attacking entity not in world.");
                             Self::reset_state(state);
                             return;
                         }
-                        Some(unit) => *unit,
+                        Some(entry) => entry,
+                    };
+                    let attacking_unit = attacker_entry.get_component::<Unit>();
+                    match attacking_unit {
+                        Err(error) => {
+                            godot_error!("ATTACKING: Attacking entity had no unit component.",);
+                            Self::reset_state(state);
+                            return;
+                        }
+                        Ok(unit) => *unit,
                     }
                 };
-
-                let defending_unit = match state.world.get_component::<Unit>(defender) {
-                    None => {
-                        godot_error!(
-                            "ATTACKING: Defending entity had not unit component. Id: {}",
-                            defender.index()
-                        );
-                        state.state = State::Waiting;
-                        return;
+                let defending_unit = {
+                    let defender_entry = match state.world.entry(*defender_entity) {
+                        None => {
+                            godot_error!("ATTACKING: Defending entity not in world.");
+                            Self::reset_state(state);
+                            return;
+                        }
+                        Some(entry) => entry,
+                    };
+                    match defender_entry.get_component::<Unit>() {
+                        Err(_) => {
+                            godot_error!("ATTACKING: Defending entity had no unit component.");
+                            state.state = State::Waiting;
+                            return;
+                        }
+                        Ok(unit) => *unit,
                     }
-                    Some(unit) => *unit,
                 };
                 let result = { attacking_unit.attack(defending_unit.borrow()) };
 
@@ -190,8 +183,8 @@ impl GameWorld {
                         godot_print!("Remaining integrity: {}", result.defender.integrity);
                         GameWorld::handle_attack_result(
                             &mut state.world,
-                            attacker,
-                            defender,
+                            *attacker_entity,
+                            *defender_entity,
                             result,
                         );
                     }
@@ -205,52 +198,45 @@ impl GameWorld {
                 let mut path = path.clone();
                 total_time += delta;
                 while total_time > SECONDS_PER_MOVEMENT {
-                    let entity = match find_entity(*entity, &state.world) {
+                    let entry = match state.world.entry(*entity) {
                         None => {
-                            godot_error!("MOVING: Entity to move had invalid id: {}", entity);
+                            godot_error!("MOVING: Entity to move does not exist in world.");
                             Self::reset_state(state);
                             return;
                         }
-                        Some(entity) => entity,
+                        Some(e) => e,
                     };
 
                     let unit = {
-                        let unit = state.world.get_component::<Unit>(entity);
+                        let unit = entry.get_component::<Unit>();
                         match unit {
-                            None => {
-                                godot_error!(
-                                    "MOVING: Entity to move has no unit component. Id: {}",
-                                    entity.index()
-                                );
-                                drop(unit);
+                            Err(_) => {
+                                godot_error!("MOVING: Entity to move has no unit component");
                                 Self::reset_state(state);
                                 return;
                             }
-                            Some(unit) => *unit,
+                            Ok(unit) => *unit,
                         }
                     };
 
                     if unit.remaining_range <= 0 {
-                        state.state = State::Selected(entity.index());
+                        state.state = State::Selected(*entity);
                         return;
                     }
 
-                    let hexagon = match state.world.get_tag::<Hexagon>(entity) {
-                        None => {
-                            godot_error!(
-                                "MOVING: Entity to move had no hexagon tag. Id: {}",
-                                entity.index()
-                            );
+                    let hexagon = match entry.get_component::<Hexagon>() {
+                        Err(_) => {
+                            godot_error!("MOVING: Entity to move had no hexagon tag.");
                             Self::reset_state(state);
                             return;
                         }
-                        Some(hexagon) => hexagon,
+                        Ok(hexagon) => hexagon,
                     };
 
                     let next_hexagon = match path.pop_front() {
                         None => {
                             godot_warn!("MOVING: Path was empty");
-                            state.state = State::Selected(entity.index());
+                            state.state = State::Selected(*entity);
                             return;
                         }
                         Some(hexagon) => hexagon,
@@ -260,11 +246,11 @@ impl GameWorld {
                         godot_error!(
                             "MOVING: Next point in path was not adjacent to current hexagon"
                         );
-                        state.state = State::Selected(entity.index());
+                        state.state = State::Selected(*entity);
                         return;
                     }
 
-                    Self::move_entity_to_hexagon(entity, &next_hexagon, &mut state.world);
+                    Self::move_entity_to_hexagon(*entity, &next_hexagon, &mut state.world);
                     total_time -= SECONDS_PER_MOVEMENT;
                 }
                 if !path.is_empty() {
@@ -290,51 +276,47 @@ impl GameWorld {
                 "Player 2".to_owned(),
                 Color::rgb(1f32, 0f32, 0f32),
             ));
-            state.world.insert(
-                (Hexagon::new_axial(2, 0), PlayerTag(0)),
-                vec![(
-                    NodeTemplate {
-                        scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 1.0,
-                        scale_y: 1.0,
-                    },
-                    Unit::new(20, 5, 1, 1, 3, 5, 5, 1),
-                )],
-            );
-            state.world.insert(
-                (Hexagon::new_axial(2, 1), PlayerTag(0)),
-                vec![(
-                    NodeTemplate {
-                        scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 1.0,
-                        scale_y: 1.0,
-                    },
-                    Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
-                )],
-            );
+            state.world.extend(vec![(
+                PlayerComponent(0),
+                Hexagon::new_axial(2, 0),
+                NodeTemplate {
+                    scene_file: "res://DummyUnit.tscn".to_owned(),
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                },
+                Unit::new(20, 5, 2, 1, 3, 5, 5, 1),
+            )]);
+            state.world.extend(vec![(
+                PlayerComponent(0),
+                Hexagon::new_axial(2, 1),
+                NodeTemplate {
+                    scene_file: "res://DummyUnit.tscn".to_owned(),
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                },
+                Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
+            )]);
 
-            state.world.insert(
-                (Hexagon::new_axial(-2, 0), PlayerTag(1)),
-                vec![(
-                    NodeTemplate {
-                        scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 1.0,
-                        scale_y: 1.0,
-                    },
-                    Unit::new(20, 5, 1, 1, 3, 5, 5, 1),
-                )],
-            );
-            state.world.insert(
-                (Hexagon::new_axial(-2, -1), PlayerTag(1)),
-                vec![(
-                    NodeTemplate {
-                        scene_file: "res://DummyUnit.tscn".to_owned(),
-                        scale_x: 1.0,
-                        scale_y: 1.0,
-                    },
-                    Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
-                )],
-            );
+            state.world.extend(vec![(
+                PlayerComponent(1),
+                Hexagon::new_axial(-2, 0),
+                NodeTemplate {
+                    scene_file: "res://DummyUnit.tscn".to_owned(),
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                },
+                Unit::new(20, 5, 2, 1, 3, 5, 5, 1),
+            )]);
+            state.world.extend(vec![(
+                PlayerComponent(1),
+                Hexagon::new_axial(-2, -1),
+                NodeTemplate {
+                    scene_file: "res://DummyUnit.tscn".to_owned(),
+                    scale_x: 1.0,
+                    scale_y: 1.0,
+                },
+                Unit::new(10, 10, 4, 2, 1, 2, 2, 1),
+            )]);
 
             state.current_player = Some(0);
         });
@@ -349,7 +331,7 @@ impl GameWorld {
             Some(event) => event,
         };
 
-        match self.current_mouse_entity {
+        match self.current_mouse_instance {
             None => {}
             Some(_) => {
                 return;
@@ -368,18 +350,19 @@ impl GameWorld {
     fn _draw(&self, owner: &Node2D) {
         with_game_state(|state| {
             if let State::Selected(selected) = state.state {
-                let selected_entity = match find_entity(selected, &state.world) {
+                let selected_entry = match state.world.entry(selected) {
                     None => {
+                        godot_error!("Selected entity not found in world.");
                         return;
                     }
-                    Some(entity) => entity,
+                    Some(e) => e,
                 };
 
-                let mut last_point = match state.world.get_tag::<Hexagon>(selected_entity) {
-                    None => {
+                let mut last_point = match selected_entry.get_component::<Hexagon>() {
+                    Err(_) => {
                         return;
                     }
-                    Some(hexagon) => get_2d_position_from_hex(hexagon, self.process.hexfield_size),
+                    Ok(hexagon) => get_2d_position_from_hex(hexagon, self.process.hexfield_size),
                 };
                 for hexagon in &state.current_path {
                     let current_point =
@@ -401,15 +384,15 @@ impl GameWorld {
 
     #[export]
     fn hex_mouse_exited(&mut self, _owner: TRef<'_, Node2D>, data: Variant) {
-        let mouse_entity_index = match self.current_mouse_entity {
+        let mouse_instance_id = match self.current_mouse_instance {
             None => {
                 return;
             }
             Some(index) => index,
         };
-        let entity_index = data.try_to_u64().unwrap() as u32;
-        if entity_index == mouse_entity_index {
-            self.current_mouse_entity = None;
+        let instance_id = data.try_to_i64().unwrap();
+        if instance_id == mouse_instance_id {
+            self.current_mouse_instance = None;
             with_game_state(|state| {
                 state.current_path = Vec::new();
             });
@@ -418,19 +401,19 @@ impl GameWorld {
 
     #[export]
     fn hex_mouse_entered(&mut self, _owner: TRef<'_, Node2D>, data: Variant) {
-        let entity_index = data.try_to_u64().unwrap() as u32;
-        self.current_mouse_entity = Some(entity_index);
+        let instance_id = data.try_to_i64().unwrap();
+        self.current_mouse_instance = Some(instance_id);
         with_game_state(|state| {
-            let selected_entity_index = match state.state {
+            let selected_entity = match state.state {
                 State::Selected(index) => index,
                 _ => {
                     state.current_path = Vec::new();
                     return;
                 }
             };
-            let selected_entity = match find_entity(selected_entity_index, &state.world) {
+            let selected_entry = match state.world.entry(selected_entity) {
                 None => {
-                    godot_error!("Entity with index {} not found", entity_index);
+                    godot_error!("Selected entity not found in World");
                     return;
                 }
                 Some(entity) => entity,
@@ -443,41 +426,42 @@ impl GameWorld {
                 Some(index) => index,
             };
 
-            let selected_player_index =
-                match Self::get_player_of_entity(selected_entity, &state.world) {
-                    None => {
-                        godot_error!("Unit {} has no assigned player", selected_entity.index());
-                        return;
-                    }
-                    Some(index) => index,
-                };
+            let selected_player_index = match Self::get_player_of_entity(selected_entry.borrow()) {
+                None => {
+                    godot_error!("Unit has no assigned player.");
+                    return;
+                }
+                Some(index) => index,
+            };
 
             if current_player_index != selected_player_index {
                 return;
             }
 
-            let selected_hexagon = match state.world.get_tag::<Hexagon>(selected_entity) {
-                None => {
-                    godot_error!("Entity with index {} has no hexagon tag", entity_index);
+            let selected_hexagon = match selected_entry.get_component::<Hexagon>() {
+                Err(_) => {
+                    godot_error!("Entity has no hexagon tag");
                     return;
                 }
-                Some(hexagon) => *hexagon,
+                Ok(hexagon) => *hexagon,
             };
 
-            let mouse_entity = match find_entity(entity_index, &state.world) {
+            let mouse_entity = match find_entity_of_instance(instance_id, &state.world) {
                 None => {
-                    godot_error!("Entity with index {} not found", entity_index);
+                    godot_error!("Entity not found in world");
                     return;
                 }
                 Some(entity) => entity,
             };
 
-            let mouse_hexagon = match state.world.get_tag::<Hexagon>(mouse_entity) {
-                None => {
+            let mouse_entry = state.world.entry(mouse_entity).unwrap();
+
+            let mouse_hexagon = match mouse_entry.get_component::<Hexagon>() {
+                Err(_) => {
                     godot_error!("Entity has no hexagon tag");
                     return;
                 }
-                Some(hexagon) => *hexagon,
+                Ok(hexagon) => *hexagon,
             };
 
             state.current_path = find_path(&selected_hexagon, &mouse_hexagon, &state.world);
@@ -493,22 +477,24 @@ impl GameWorld {
 
     #[export]
     fn hex_left_clicked(&mut self, _owner: TRef<'_, Node2D>, data: Variant) {
-        let entity_index = data.try_to_u64().unwrap() as u32;
+        let instance_id = data.try_to_i64().unwrap();
         with_game_state(|state| {
-            let self_entity = match find_entity(entity_index, &state.world) {
+            let self_entity = match find_entity_of_instance(instance_id, &state.world) {
                 None => {
-                    godot_error!("Entity with index {} not found", entity_index);
+                    godot_error!("Entity not found in world");
                     return;
                 }
                 Some(entity) => entity,
             };
 
-            let clicked_hexagon = match state.world.get_tag::<Hexagon>(self_entity) {
-                None => {
+            let self_entry = state.world.entry(self_entity).unwrap();
+
+            let clicked_hexagon = match self_entry.get_component::<Hexagon>() {
+                Err(_) => {
                     godot_error!("Entity has no hexagon tag");
                     return;
                 }
-                Some(hexagon) => *hexagon,
+                Ok(hexagon) => *hexagon,
             };
 
             let entities_at_hexagon = get_entities_at_hexagon(&clicked_hexagon, &state.world);
@@ -520,7 +506,14 @@ impl GameWorld {
 
             let mut clicked_entity = entities_at_hexagon
                 .iter()
-                .find(|entity| state.world.has_component::<Unit>(**entity))
+                .find(|entity| {
+                    state
+                        .world
+                        .entry(**entity)
+                        .unwrap()
+                        .get_component::<Unit>()
+                        .is_ok()
+                })
                 .cloned();
 
             if clicked_entity == None {
@@ -537,47 +530,53 @@ impl GameWorld {
 
             match state.state {
                 State::Waiting => {
-                    if !state.world.has_component::<Unit>(clicked_entity) {
-                        return;
+                    let clicked_entry = state.world.entry(clicked_entity).unwrap();
+                    if clicked_entry.get_component::<Unit>().is_ok() {
+                        state.state = State::Selected(clicked_entity)
                     }
-                    state.state = State::Selected(clicked_entity.index())
                 }
                 State::Selected(selected_entity) => {
-                    {
-                        let selected_entity = state
-                            .world
-                            .iter_entities()
-                            .find(|entity| entity.index() == selected_entity);
-                        match selected_entity {
-                            None => {}
-                            Some(selected_entity) => {
-                                if selected_entity == clicked_entity {
-                                } else if state.world.has_component::<Unit>(clicked_entity) {
-                                    let selected_unit =
-                                        match state.world.get_component::<Unit>(selected_entity) {
-                                            None => {
-                                                return;
-                                            }
-                                            Some(unit) => unit,
-                                        };
+                    let (clicked_player_id, clicked_unit) = {
+                        let clicked_entry = state.world.entry(clicked_entity).unwrap();
+                        let clicked_unit = match clicked_entry.get_component::<Unit>() {
+                            Ok(unit) => Some(*unit),
+                            Err(_) => None,
+                        };
+                        (
+                            GameWorld::get_player_of_entity(clicked_entry.borrow()),
+                            clicked_unit,
+                        )
+                    };
 
+                    if state.world.contains(selected_entity) {
+                        if selected_entity == clicked_entity {
+                        } else {
+                            match clicked_unit {
+                                Some(clicked_unit) => {
+                                    let selected_entry =
+                                        state.world.entry(selected_entity).unwrap();
                                     let selected_hexagon =
-                                        match state.world.get_tag::<Hexagon>(selected_entity) {
-                                            None => {
-                                                godot_error!(
-                                                    "Selected entity has no hexagon tag. Id: {}",
-                                                    selected_entity.index()
-                                                );
-                                                drop(selected_unit);
+                                        match selected_entry.get_component::<Hexagon>() {
+                                            Err(_) => {
+                                                godot_error!("Selected entity has no hexagon tag.");
                                                 Self::reset_state(state);
                                                 return;
                                             }
-                                            Some(hexagon) => hexagon,
+                                            Ok(hexagon) => hexagon,
                                         };
 
                                     let distance = selected_hexagon.distance_to(&clicked_hexagon);
 
+                                    let selected_unit =
+                                        selected_entry.get_component::<Unit>().unwrap();
+
                                     if !selected_unit.can_attack(distance) {
+                                        godot_print!(
+                                            "{} ? {}-{}",
+                                            distance,
+                                            selected_unit.min_attack_range,
+                                            selected_unit.max_attack_range
+                                        );
                                         return;
                                     }
 
@@ -589,109 +588,98 @@ impl GameWorld {
                                     };
 
                                     let selected_player_id = match GameWorld::get_player_of_entity(
-                                        selected_entity,
-                                        &state.world,
+                                        selected_entry.borrow(),
                                     ) {
                                         None => {
-                                            godot_error!(
-                                                "Unit {} has no assigned player",
-                                                selected_entity.index()
-                                            );
+                                            godot_error!("Selected unit has no assigned player");
                                             return;
                                         }
                                         Some(id) => id,
                                     };
 
                                     if current_player_id != selected_player_id {
-                                        state.state = State::Selected(clicked_entity.index());
+                                        state.state = State::Selected(clicked_entity);
                                         return;
                                     }
 
-                                    let clicked_player_id =
-                                        match state.world.get_tag::<PlayerTag>(clicked_entity) {
-                                            None => {
-                                                godot_error!(
-                                                    "Unit {} has no assigned player",
-                                                    clicked_entity.index()
-                                                );
-                                                return;
-                                            }
-                                            Some(player) => player.0,
-                                        };
+                                    let clicked_player_id = match clicked_player_id {
+                                        None => {
+                                            godot_error!("Click unit has no assigned player");
+                                            return;
+                                        }
+                                        Some(id) => id,
+                                    };
 
                                     if clicked_player_id != selected_player_id {
-                                        state.state = State::Attacking(
-                                            selected_entity.index(),
-                                            clicked_entity.index(),
-                                        );
+                                        state.state =
+                                            State::Attacking(selected_entity, clicked_entity);
                                     }
-                                } else {
-                                    let current_player_id = match state.current_player {
-                                        None => {
-                                            return;
-                                        }
-                                        Some(player) => player,
-                                    };
-                                    let selected_player_id = match GameWorld::get_player_of_entity(
-                                        selected_entity,
-                                        &state.world,
-                                    ) {
-                                        None => {
-                                            godot_error!(
-                                                "Unit {} has no assigned player",
-                                                selected_entity.index()
-                                            );
-                                            return;
-                                        }
-                                        Some(id) => id,
-                                    };
-
-                                    if current_player_id != selected_player_id {
-                                        Self::reset_state(state);
-                                        return;
-                                    }
-                                    let selected_hexagon =
-                                        match state.world.get_tag::<Hexagon>(selected_entity) {
+                                }
+                                None => {
+                                    let selected_hexagon = {
+                                        let selected_entry =
+                                            state.world.entry(selected_entity).unwrap();
+                                        let current_player_id = match state.current_player {
                                             None => {
+                                                return;
+                                            }
+                                            Some(player) => player,
+                                        };
+                                        let selected_player_id =
+                                            match GameWorld::get_player_of_entity(
+                                                selected_entry.borrow(),
+                                            ) {
+                                                None => {
+                                                    godot_error!(
+                                                        "Selected unit has no assigned player"
+                                                    );
+                                                    return;
+                                                }
+                                                Some(id) => id,
+                                            };
+
+                                        if current_player_id != selected_player_id {
+                                            Self::reset_state(state);
+                                            return;
+                                        }
+                                        match selected_entry.get_component::<Hexagon>() {
+                                            Err(_) => {
                                                 godot_error!(
-                                                    "Selected entity has no hexagon tag. Id: {}",
-                                                    selected_entity.index()
+                                                    "Selected entity has no hexagon component."
                                                 );
                                                 Self::reset_state(state);
                                                 return;
                                             }
-                                            Some(hexagon) => hexagon,
-                                        };
-                                    let path =
-                                        find_path(selected_hexagon, &clicked_hexagon, &state.world);
+                                            Ok(hexagon) => *hexagon,
+                                        }
+                                    };
+                                    let path = find_path(
+                                        &selected_hexagon,
+                                        &clicked_hexagon,
+                                        &state.world,
+                                    );
 
                                     if path.is_empty() {
-                                        godot_warn!(
-                                            "Path from entity to target not found. Id: {}",
-                                            selected_entity.index()
-                                        );
+                                        godot_warn!("Path from entity to target not found.",);
                                         Self::reset_state(state);
                                         return;
                                     }
-                                    state.state = State::Moving(
-                                        selected_entity.index(),
-                                        VecDeque::from(path),
-                                        0f64,
-                                    );
+                                    state.state =
+                                        State::Moving(selected_entity, VecDeque::from(path), 0f64);
                                 }
                             }
                         }
-                    };
+                    }
                 }
                 _ => {}
             }
         });
     }
 
-    fn get_player_of_entity(entity: Entity, world: &World) -> Option<usize> {
-        match world.get_tag::<PlayerTag>(entity) {
-            None => None,
-            Some(player) => Some(player.0),
+    fn get_player_of_entity(entry: &Entry<'_>) -> Option<usize> {
+        match entry.get_component::<PlayerComponent>() {
+            Err(_) => None,
+            Ok(player) => Some(player.0),
         }
     }
 
@@ -703,7 +691,7 @@ impl GameWorld {
     #[export]
     pub fn on_new_round(&mut self, _owner: TRef<'_, Node2D>) {
         with_game_state(|state| {
-            for mut unit in <Write<Unit>>::query().iter_mut(&mut state.world) {
+            for mut unit in <&mut Unit>::query().iter_mut(&mut state.world) {
                 unit.remaining_attacks = 1;
                 unit.remaining_range = unit.mobility;
             }
@@ -723,8 +711,15 @@ impl GameWorld {
     }
 
     fn move_entity_to_hexagon(entity: Entity, hexagon: &Hexagon, world: &mut World) {
-        let selected_unit = *world.get_component::<Unit>(entity).unwrap();
-        let selected_hexagon = *world.get_tag::<Hexagon>(entity).unwrap();
+        let mut entry = match world.entry(entity) {
+            None => {
+                godot_error!("Entity not found in world");
+                return;
+            }
+            Some(mut e) => e,
+        };
+        let selected_unit = *entry.get_component::<Unit>().unwrap();
+        let selected_hexagon = *entry.get_component::<Hexagon>().unwrap();
         let distance = selected_hexagon.distance_to(&hexagon);
         let can_move = selected_unit.can_move(distance);
         match can_move {
@@ -740,13 +735,8 @@ impl GameWorld {
                     remaining_range,
                     selected_unit.remaining_attacks,
                 );
-                world
-                    .add_tag(entity, updated_hexagon)
-                    .expect("Could not updated selected entity hexagon data");
-
-                world
-                    .add_component(entity, updated_selected_unit)
-                    .expect("Could not updated selected entity unit data");
+                entry.add_component(updated_selected_unit);
+                entry.add_component(updated_hexagon);
             }
             CanMove::No => {}
         }
@@ -758,16 +748,22 @@ impl GameWorld {
         defender: Entity,
         result: AttackResult,
     ) {
-        world
-            .add_component(attacker, result.attacker)
-            .expect("Could not update data of selected unit");
+        match world.entry(attacker) {
+            None => {}
+            Some(mut e) => {
+                e.add_component(result.attacker);
+            }
+        }
 
-        if result.defender.integrity <= 0 {
-            world.delete(defender);
-        } else {
-            world
-                .add_component(defender, result.defender)
-                .expect("Could not update data of clicked unit");
+        match world.entry(defender) {
+            None => {}
+            Some(mut e) => {
+                if result.defender.integrity <= 0 {
+                    world.remove(defender);
+                } else {
+                    e.add_component(result.defender);
+                }
+            }
         }
     }
 }
@@ -775,16 +771,17 @@ impl GameWorld {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use legion::WorldOptions;
 
     #[test]
     fn handle_attack_result_updates_components() {
-        let world = &mut Universe::new().create_world();
+        let mut world = World::new(WorldOptions::default());
         let attacker = *world
-            .insert((), vec![(Unit::new(1, 1, 0, 0, 0, 0, 0, 1),)])
+            .extend(vec![(Unit::new(1, 1, 0, 0, 0, 0, 0, 1),)])
             .first()
             .unwrap();
         let defender = *world
-            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
+            .extend(vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
             .first()
             .unwrap();
         let result = AttackResult {
@@ -793,23 +790,26 @@ mod tests {
             actual_damage: 1,
         };
 
-        GameWorld::handle_attack_result(world, attacker, defender, result);
+        GameWorld::handle_attack_result(&mut world, attacker, defender, result);
 
-        let changed_attacker = world.get_component::<Unit>(attacker).unwrap();
+        let entry = world.entry(attacker).unwrap();
+        let changed_attacker = entry.get_component::<Unit>().unwrap();
         assert_eq!(changed_attacker.remaining_attacks, 0);
-        let changed_defender = world.get_component::<Unit>(defender).unwrap();
+
+        let entry = world.entry(defender).unwrap();
+        let changed_defender = entry.get_component::<Unit>().unwrap();
         assert_eq!(changed_defender.integrity, 1);
     }
 
     #[test]
     fn handle_attack_result_removes_defender_when_integrity_lower_or_eq_0() {
-        let world = &mut Universe::new().create_world();
+        let mut world = World::new(WorldOptions::default());
         let attacker = *world
-            .insert((), vec![(Unit::new(1, 2, 0, 0, 0, 0, 0, 1),)])
+            .extend(vec![(Unit::new(1, 2, 0, 0, 0, 0, 0, 1),)])
             .first()
             .unwrap();
         let defender = *world
-            .insert((), vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
+            .extend(vec![(Unit::new(2, 1, 0, 0, 0, 0, 0, 0),)])
             .first()
             .unwrap();
         let result = AttackResult {
@@ -818,27 +818,28 @@ mod tests {
             actual_damage: 1,
         };
 
-        GameWorld::handle_attack_result(world, attacker, defender, result);
+        GameWorld::handle_attack_result(&mut world, attacker, defender, result);
 
-        assert!(!world.is_alive(defender));
+        assert!(!world.contains(defender));
     }
 
     #[test]
     fn handle_attack_results_only_changes_affected_fields() {
-        let world = &mut Universe::new().create_world();
+        let mut world = World::new(WorldOptions::default());
         let attacking_unit = Unit::new(1, 1, 2, 4, 5, 3, 0, 1);
-        let attacker = *world.insert((), vec![(attacking_unit,)]).first().unwrap();
+        let attacker = *world.extend(vec![(attacking_unit,)]).first().unwrap();
         let defending_unit = Unit::new(2, 4, 5, 3, 2, 4, 0, 0);
-        let defender = *world.insert((), vec![(defending_unit,)]).first().unwrap();
+        let defender = *world.extend(vec![(defending_unit,)]).first().unwrap();
         let result = AttackResult {
             attacker: attacking_unit,
             defender: defending_unit,
             actual_damage: 1,
         };
 
-        GameWorld::handle_attack_result(world, attacker, defender, result);
+        GameWorld::handle_attack_result(&mut world, attacker, defender, result);
 
-        let changed_attacker = world.get_component::<Unit>(attacker).unwrap();
+        let entry = world.entry(attacker).unwrap();
+        let changed_attacker = entry.get_component::<Unit>().unwrap();
         assert_eq!(changed_attacker.damage, attacking_unit.damage);
         assert_eq!(
             changed_attacker.max_attack_range,
@@ -851,7 +852,8 @@ mod tests {
         assert_eq!(changed_attacker.armor, attacking_unit.armor);
         assert_eq!(changed_attacker.mobility, attacking_unit.mobility);
 
-        let changed_defender = world.get_component::<Unit>(defender).unwrap();
+        let entry = world.entry(defender).unwrap();
+        let changed_defender = entry.get_component::<Unit>().unwrap();
         assert_eq!(changed_defender.damage, defending_unit.damage);
         assert_eq!(
             changed_defender.max_attack_range,
@@ -867,33 +869,35 @@ mod tests {
 
     #[test]
     fn move_entity_to_hexagon_updates_entity() {
-        let world = &mut Universe::new().create_world();
+        let mut world = World::new(WorldOptions::default());
         let entity = *world
-            .insert(
-                (Hexagon::new_axial(0, 0),),
-                vec![(Unit::new(0, 0, 0, 0, 0, 0, 2, 0),)],
-            )
+            .extend(vec![(
+                Hexagon::new_axial(0, 0),
+                Unit::new(0, 0, 0, 0, 0, 0, 2, 0),
+            )])
             .first()
             .unwrap();
 
-        GameWorld::move_entity_to_hexagon(entity, &Hexagon::new_axial(1, 1), world);
+        GameWorld::move_entity_to_hexagon(entity, &Hexagon::new_axial(1, 1), &mut world);
 
-        let hexagon = world.get_tag::<Hexagon>(entity).unwrap();
+        let entry = world.entry(entity).unwrap();
+        let hexagon = entry.get_component::<Hexagon>().unwrap();
         assert_eq!(hexagon.get_q(), 1);
         assert_eq!(hexagon.get_r(), 1);
     }
 
     #[test]
     fn move_entity_to_hexagon_does_nothing_if_entity_cannot_move() {
-        let world = &mut Universe::new().create_world();
+        let mut world = World::default();
         let entity = *world
-            .insert(
-                (Hexagon::new_axial(5, 5),),
-                vec![(Unit::new(0, 0, 0, 0, 0, 0, 1, 0),)],
-            )
+            .extend(vec![(
+                Hexagon::new_axial(5, 5),
+                Unit::new(0, 0, 0, 0, 0, 0, 1, 0),
+            )])
             .first()
             .unwrap();
-        let hexagon = world.get_tag::<Hexagon>(entity).unwrap();
+        let entry = world.entry(entity).unwrap();
+        let hexagon = entry.get_component::<Hexagon>().unwrap();
         assert_eq!(hexagon.get_q(), 5);
         assert_eq!(hexagon.get_r(), 5);
     }

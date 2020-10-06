@@ -39,8 +39,8 @@ impl Unit {
         } else {
             let actual_damage = self.damage - defender.armor;
 
-            let mut attacker = self.clone();
-            let mut defender = defender.clone();
+            let mut attacker = *self;
+            let mut defender = *defender;
             defender.integrity -= actual_damage;
             attacker.remaining_range = 0;
             attacker.remaining_attacks -= 1;
@@ -162,9 +162,8 @@ mod tests {
         let attacker = Unit::new(0, 4, 0, 0, 0, 0, 0, 0);
 
         let result = attacker.attack(&defender);
-        match result {
-            Ok(_) => panic!("Expected a result with Error value"),
-            Err(_) => {}
+        if result.is_ok() {
+            panic!("Expected a result with Error value")
         };
     }
 

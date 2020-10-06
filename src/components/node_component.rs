@@ -1,5 +1,6 @@
 use gdnative::prelude::*;
 
+#[derive(Copy, Clone)]
 pub struct NodeComponent {
     pub node: Ref<Node2D>,
 }
