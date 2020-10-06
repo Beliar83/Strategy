@@ -95,7 +95,9 @@ pub enum Direction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tags::hexagon::Direction::{East, NorthEast, NorthWest, SouthEast, SouthWest, West};
+    use crate::components::hexagon::Direction::{
+        East, NorthEast, NorthWest, SouthEast, SouthWest, West,
+    };
 
     macro_rules! new_axial_calculates_s_correctly {
         ($($name:ident: $value:expr,)*) => {

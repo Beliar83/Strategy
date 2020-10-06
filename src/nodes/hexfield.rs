@@ -1,14 +1,16 @@
+use crate::components::hexagon::Hexagon;
+use crate::components::node_component::NodeComponent;
+use crate::components::player::Player;
 use crate::components::unit::{CanMove, Unit};
 use crate::game_state::State;
 use crate::systems::hexgrid::{find_path, get_entities_at_hexagon};
-use crate::systems::{find_entity, with_game_state};
-use crate::tags::hexagon::Hexagon;
-use crate::tags::player::Player;
+use crate::systems::{find_entity_of_instance, with_game_state};
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::GlobalConstants;
 use gdnative::api::{Area2D, Polygon2D};
 use gdnative::prelude::*;
-use legion::prelude::*;
+use legion::world::{ComponentError, Entry};
+use legion::{EntityStore, IntoQuery, Read};
 
 #[derive(NativeClass)]
 #[inherit(Area2D)]
@@ -57,25 +59,25 @@ impl HexField {
         let mut colour = Color::rgba(0f32, 0f32, 0f32, 0f32);
         with_game_state(|state| {
             let (selected_unit, selected_hexagon, select_unit_player) = match state.state {
-                State::Selected(index) => {
-                    let entity = match find_entity(index, &state.world) {
+                State::Selected(entity) => {
+                    let entry = match state.world.entry(entity) {
                         None => return,
                         Some(entity) => entity,
                     };
 
-                    let hexagon = match state.world.get_tag::<Hexagon>(entity) {
-                        None => return,
-                        Some(hexagon) => hexagon,
+                    let hexagon = match entry.get_component::<Hexagon>() {
+                        Err(_) => return,
+                        Ok(hexagon) => *hexagon,
                     };
 
-                    let unit = match state.world.get_component::<Unit>(entity) {
-                        None => return,
-                        Some(unit) => unit,
+                    let unit = match entry.get_component::<Unit>() {
+                        Err(_) => return,
+                        Ok(unit) => *unit,
                     };
 
-                    let player = match state.world.get_tag::<Player>(entity) {
-                        None => return,
-                        Some(player) => player,
+                    let player = match entry.get_component::<Player>() {
+                        Err(_) => return,
+                        Ok(player) => *player,
                     };
 
                     (unit, hexagon, player)
@@ -83,51 +85,67 @@ impl HexField {
                 _ => return,
             };
 
-            let self_entity_index = owner.get_meta("Entity").to_u64() as u32;
-            let self_entity = find_entity(self_entity_index, &state.world);
-            let self_entity = match self_entity {
-                None => {
-                    return;
-                }
-                Some(entity) => entity,
-            };
-
-            let self_hexagon = match state.world.get_tag::<Hexagon>(self_entity) {
-                None => {
-                    return;
-                }
-                Some(hexagon) => hexagon,
-            };
-            match selected_unit
-                .can_move(find_path(&selected_hexagon, self_hexagon, &state.world).len() as i32)
-            {
-                CanMove::Yes(_) => {
-                    colour.b = 1f32;
-                    colour.a = 0.25f32;
-                }
-                CanMove::No => {}
-            }
-
-            if selected_unit.can_attack(selected_hexagon.distance_to(self_hexagon)) {
-                let entities_on_field = get_entities_at_hexagon(self_hexagon, &state.world);
-                let entity_of_unit_on_field = entities_on_field
-                    .iter()
-                    .find(|entity| state.world.has_component::<Unit>(**entity));
-                let mut same_player = false;
-                match entity_of_unit_on_field {
-                    None => {}
-                    Some(entity) => match state.world.get_tag::<Player>(*entity) {
-                        None => {}
-                        Some(player) => {
-                            same_player = player == select_unit_player;
+            let self_instance_id = owner.get_instance_id();
+            <(&Hexagon, &NodeComponent)>::query()
+                .iter(&state.world)
+                .for_each(|data| {
+                    let node_instance_id = unsafe {
+                        match data.1.node.assume_safe_if_sane() {
+                            None => -1i64,
+                            Some(node) => node.get_instance_id(),
                         }
-                    },
-                }
-                if !same_player {
-                    colour.r = 1f32;
-                    colour.a = 0.25f32;
-                }
-            }
+                    };
+                    if self_instance_id == node_instance_id {
+                        let self_hexagon = data.0;
+                        match selected_unit.can_move(
+                            find_path(&selected_hexagon, &self_hexagon, &state.world).len() as i32,
+                        ) {
+                            CanMove::Yes(_) => {
+                                colour.b = 1f32;
+                                colour.a = 0.25f32;
+                            }
+                            CanMove::No => {}
+                        }
+
+                        if selected_unit.can_attack(selected_hexagon.distance_to(&self_hexagon)) {
+                            let entities_on_field =
+                                get_entities_at_hexagon(&self_hexagon, &state.world);
+                            let mut entity_of_unit_on_field = None;
+                            for entity in entities_on_field {
+                                let entry = match state.world.entry_ref(entity) {
+                                    Err(_) => {
+                                        continue;
+                                    }
+                                    Ok(entry) => entry,
+                                };
+                                match entry.get_component::<Unit>() {
+                                    Ok(_) => {
+                                        entity_of_unit_on_field = Some(entity);
+                                        break;
+                                    }
+                                    Err(_) => continue,
+                                }
+                            }
+                            let mut same_player = false;
+                            match entity_of_unit_on_field {
+                                None => {}
+                                Some(entity) => match state.world.entry_ref(entity) {
+                                    Err(_) => {}
+                                    Ok(entry) => match entry.get_component::<Player>() {
+                                        Err(_) => {}
+                                        Ok(player) => {
+                                            same_player = *player == select_unit_player;
+                                        }
+                                    },
+                                },
+                            }
+                            if !same_player {
+                                colour.r = 1f32;
+                                colour.a = 0.25f32;
+                            }
+                        }
+                    }
+                });
         });
         colour
     }
@@ -137,7 +155,7 @@ impl HexField {
         self.hovered = true;
         owner.emit_signal(
             "hex_mouse_entered",
-            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+            &[Variant::from_i64(owner.get_instance_id())],
         );
     }
 
@@ -146,7 +164,7 @@ impl HexField {
         self.hovered = false;
         owner.emit_signal(
             "hex_mouse_exited",
-            &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+            &[Variant::from_i64(owner.get_instance_id())],
         );
     }
 
@@ -199,12 +217,12 @@ impl HexField {
         if event.button_index() == GlobalConstants::BUTTON_RIGHT {
             owner.emit_signal(
                 "hex_right_clicked",
-                &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+                &[Variant::from_i64(owner.get_instance_id())],
             );
         } else if event.button_index() == GlobalConstants::BUTTON_LEFT {
             owner.emit_signal(
                 "hex_left_clicked",
-                &[Variant::from_u64(owner.get_meta("Entity").to_u64())],
+                &[Variant::from_i64(owner.get_instance_id())],
             );
         }
     }

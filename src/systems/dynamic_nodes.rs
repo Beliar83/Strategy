@@ -1,10 +1,11 @@
-use super::hexgrid::get_2d_position_from_hex;
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
-use crate::systems::HexfieldSize;
-use crate::tags::hexagon::Hexagon;
 use gdnative::prelude::*;
-use legion::prelude::*;
+use legion::systems::Runnable;
+use legion::world::{ComponentError, Entry};
+use legion::{
+    component, Entity, EntityStore, IntoQuery, Read, Schedule, SystemBuilder, World, Write,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ManageErrs {
@@ -13,21 +14,13 @@ pub enum ManageErrs {
 }
 
 pub fn create_nodes(world: &mut World, root: &Node2D) {
-    let mut relevant_entities = Vec::new();
-
-    let iter = world.iter_entities();
-    for entity in iter {
-        if !world.has_component::<NodeTemplate>(entity) {
-            continue;
-        }
-        if world.has_component::<NodeComponent>(entity) {
-            continue;
-        }
-        relevant_entities.push(entity);
-    }
-
-    for entity in relevant_entities {
-        let node_data = world.get_component::<NodeTemplate>(entity).unwrap();
+    let entity_data: Vec<(Entity, NodeTemplate)> = <&NodeTemplate>::query()
+        .filter(!component::<NodeComponent>())
+        .iter_chunks(world)
+        .flat_map(|chunk| chunk.into_iter_entities())
+        .map(|data| (data.0, data.1.clone()))
+        .collect();
+    for (entity, node_data) in entity_data {
         let template = load_scene(&node_data.scene_file);
 
         let template = if let Some(template) = &template {
@@ -39,20 +32,16 @@ pub fn create_nodes(world: &mut World, root: &Node2D) {
 
         match instance_scene::<Node2D>(template) {
             Ok(node2d) => {
-                let node2d = node2d.into_shared();
+                let node2d: Ref<Node2D> = node2d.into_shared();
                 unsafe {
                     let node2d = node2d.assume_safe_if_sane().unwrap();
                     node2d.set_z_as_relative(false);
                     node2d.set_scale(Vector2::new(node_data.scale_x, node_data.scale_y));
-                    node2d.set_meta("Entity", entity.index());
                 }
-                drop(node_data);
                 root.add_child(node2d, false);
 
-                match world.add_component(entity, NodeComponent { node: node2d }) {
-                    Ok(_) => {}
-                    Err(_) => godot_print!("Could not add NodeComponent for created node"),
-                }
+                let mut entry = world.entry(entity).unwrap();
+                entry.add_component(NodeComponent { node: node2d });
             }
             Err(err) => godot_print!("Could not instance Child : {:?}", err),
         }
@@ -80,18 +69,4 @@ where
     instance
         .try_cast::<Root>()
         .map_err(|instance| ManageErrs::RootClassNotSpatial(instance.name().to_string()))
-}
-
-pub fn update_nodes() -> Box<dyn Runnable> {
-    SystemBuilder::new("update_nodes")
-        .with_query(<(Write<NodeComponent>, Tagged<Hexagon>)>::query())
-        .read_resource::<HexfieldSize>()
-        .build_thread_local(|_, world, hexfield_size, query| {
-            for (node, position) in query.iter_mut(world) {
-                unsafe {
-                    let position = get_2d_position_from_hex(&position, hexfield_size.0);
-                    node.node.assume_safe().set_position(position);
-                }
-            }
-        })
 }

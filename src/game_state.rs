@@ -1,6 +1,6 @@
+use crate::components::hexagon::Hexagon;
 use crate::player::Player;
-use crate::tags::hexagon::Hexagon;
-use legion::prelude::*;
+use legion::{Entity, World};
 use std::collections::vec_deque::VecDeque;
 
 pub struct GameState {
@@ -14,7 +14,7 @@ pub struct GameState {
 impl GameState {
     pub fn new() -> GameState {
         Self {
-            world: Universe::new().create_world(),
+            world: World::default(),
             state: State::Waiting,
             players: Vec::new(),
             current_player: None,
@@ -25,7 +25,7 @@ impl GameState {
 
 pub enum State {
     Waiting,
-    Selected(u32),
-    Attacking(u32, u32),
-    Moving(u32, VecDeque<Hexagon>, f64),
+    Selected(Entity),
+    Attacking(Entity, Entity),
+    Moving(Entity, VecDeque<Hexagon>, f64),
 }
