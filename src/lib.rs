@@ -20,6 +20,7 @@ mod game_state;
 mod nodes;
 mod player;
 mod systems;
+mod legion;
 
 use gdnative::prelude::*;
 use nodes::{dummy_unit, gameworld, hexfield, map_ui};

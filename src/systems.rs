@@ -55,13 +55,15 @@ pub struct HexfieldSize(pub i32);
 pub struct UpdateNodes {
     resources: Resources,
     schedule: Schedule,
-    pub hexfield_size: i32,
 }
 
 impl UpdateNodes {
-    pub fn new(hexfield_size: i32) -> Self {
+    pub fn new() -> Self {
         let mut resources = Resources::default();
-        resources.insert(HexfieldSize(hexfield_size));
+
+        with_game_state(|state| {
+            resources.insert(HexfieldSize(state.hexfield_size));
+        });
 
         let schedule = Schedule::builder()
             .add_system(
@@ -81,17 +83,15 @@ impl UpdateNodes {
         Self {
             resources,
             schedule,
-            hexfield_size,
         }
     }
 
     pub fn execute(&mut self, root: &Node2D, _delta: f64) {
-        if let Some(mut d) = self.resources.get_mut::<HexfieldSize>() {
-            d.0 = self.hexfield_size
-        }
-
         with_game_state(|state| {
             create_nodes(&mut state.world, root);
+            if let Some(mut d) = self.resources.get_mut::<HexfieldSize>() {
+                d.0 = state.hexfield_size
+            }
         });
 
         with_game_state(|state| {

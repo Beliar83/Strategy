@@ -9,6 +9,7 @@ pub struct GameState {
     pub players: Vec<Player>,
     pub current_player: Option<usize>,
     pub current_path: Vec<Hexagon>,
+    pub hexfield_size: i32,
 }
 
 impl GameState {
@@ -19,6 +20,7 @@ impl GameState {
             players: Vec::new(),
             current_player: None,
             current_path: Vec::new(),
+            hexfield_size: 0,
         }
     }
 }
