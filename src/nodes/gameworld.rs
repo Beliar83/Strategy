@@ -5,6 +5,7 @@ use crate::components::player::Player as PlayerComponent;
 use crate::components::unit::{AttackError, AttackResult, CanMove, Unit};
 use crate::game_state::GameState;
 use crate::game_state::State;
+use crate::nodes::hexfield::HexField;
 use crate::player::Player;
 use crate::systems::hexgrid::{
     create_grid, find_path, get_2d_position_from_hex, get_entities_at_hexagon,
@@ -15,16 +16,14 @@ use crossbeam::crossbeam_channel;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::GlobalConstants;
 use gdnative::prelude::*;
-use legion::query::Query;
-use legion::world::{ComponentError, EntityAccessError, Entry, Event, StorageAccessor};
-use legion::{component, Entity, EntityStore, IntoQuery, World, Write};
+use legion::world::{Entry, Event, StorageAccessor};
+use legion::{component, Entity, IntoQuery, World, Write};
 use std::borrow::Borrow;
 use std::collections::vec_deque::VecDeque;
 use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
-#[register_with(Self::register)]
 pub struct GameWorld {
     process: UpdateNodes,
     event_receiver: Receiver<Event>,
@@ -42,22 +41,14 @@ impl GameWorld {
             state
                 .world
                 .subscribe(sender.clone(), component::<NodeComponent>());
+            state.hexfield_size = 40;
         });
         Self {
-            process: UpdateNodes::new(40),
+            process: UpdateNodes::new(),
             event_receiver: receiver,
             node_entity: HashMap::new(),
             current_mouse_instance: None,
         }
-    }
-
-    fn register(builder: &ClassBuilder<Self>) {
-        builder
-            .add_property("hexfield_size")
-            .with_default(40)
-            .with_getter(|instance, _| instance.process.hexfield_size)
-            .with_setter(|instance, _, value| instance.process.hexfield_size = value)
-            .done();
     }
 
     #[export]
@@ -362,11 +353,10 @@ impl GameWorld {
                     Err(_) => {
                         return;
                     }
-                    Ok(hexagon) => get_2d_position_from_hex(hexagon, self.process.hexfield_size),
+                    Ok(hexagon) => get_2d_position_from_hex(hexagon, state.hexfield_size),
                 };
                 for hexagon in &state.current_path {
-                    let current_point =
-                        get_2d_position_from_hex(&hexagon, self.process.hexfield_size);
+                    let current_point = get_2d_position_from_hex(&hexagon, state.hexfield_size);
 
                     owner.draw_line(
                         last_point,
@@ -536,81 +526,30 @@ impl GameWorld {
                     }
                 }
                 State::Selected(selected_entity) => {
-                    let (clicked_player_id, clicked_unit) = {
+                    let clicked_unit = {
                         let clicked_entry = state.world.entry(clicked_entity).unwrap();
-                        let clicked_unit = match clicked_entry.get_component::<Unit>() {
+                        match clicked_entry.get_component::<Unit>() {
                             Ok(unit) => Some(*unit),
                             Err(_) => None,
-                        };
-                        (
-                            GameWorld::get_player_of_entity(clicked_entry.borrow()),
-                            clicked_unit,
-                        )
+                        }
                     };
 
                     if state.world.contains(selected_entity) {
                         if selected_entity == clicked_entity {
                         } else {
                             match clicked_unit {
-                                Some(clicked_unit) => {
-                                    let selected_entry =
-                                        state.world.entry(selected_entity).unwrap();
-                                    let selected_hexagon =
-                                        match selected_entry.get_component::<Hexagon>() {
-                                            Err(_) => {
-                                                godot_error!("Selected entity has no hexagon tag.");
-                                                Self::reset_state(state);
-                                                return;
-                                            }
-                                            Ok(hexagon) => hexagon,
-                                        };
-
-                                    let distance = selected_hexagon.distance_to(&clicked_hexagon);
-
-                                    let selected_unit =
-                                        selected_entry.get_component::<Unit>().unwrap();
-
-                                    if !selected_unit.can_attack(distance) {
-                                        godot_print!(
-                                            "{} ? {}-{}",
-                                            distance,
-                                            selected_unit.min_attack_range,
-                                            selected_unit.max_attack_range
-                                        );
-                                        return;
-                                    }
-
-                                    let current_player_id = match state.current_player {
-                                        None => {
-                                            return;
-                                        }
-                                        Some(player) => player,
+                                Some(_) => {
+                                    let is_visible = match _owner.get_world_2d() {
+                                        None => false,
+                                        Some(world) => HexField::is_hexagon_visible_for_attack(
+                                            world,
+                                            state,
+                                            selected_entity,
+                                            clicked_hexagon,
+                                        ),
                                     };
 
-                                    let selected_player_id = match GameWorld::get_player_of_entity(
-                                        selected_entry.borrow(),
-                                    ) {
-                                        None => {
-                                            godot_error!("Selected unit has no assigned player");
-                                            return;
-                                        }
-                                        Some(id) => id,
-                                    };
-
-                                    if current_player_id != selected_player_id {
-                                        state.state = State::Selected(clicked_entity);
-                                        return;
-                                    }
-
-                                    let clicked_player_id = match clicked_player_id {
-                                        None => {
-                                            godot_error!("Click unit has no assigned player");
-                                            return;
-                                        }
-                                        Some(id) => id,
-                                    };
-
-                                    if clicked_player_id != selected_player_id {
+                                    if is_visible {
                                         state.state =
                                             State::Attacking(selected_entity, clicked_entity);
                                     }
@@ -721,7 +660,7 @@ impl GameWorld {
         let selected_unit = *entry.get_component::<Unit>().unwrap();
         let selected_hexagon = *entry.get_component::<Hexagon>().unwrap();
         let distance = selected_hexagon.distance_to(&hexagon);
-        let can_move = selected_unit.can_move(distance);
+        let can_move = selected_unit.is_in_movement_range(distance);
         match can_move {
             CanMove::Yes(remaining_range) => {
                 let updated_hexagon = Hexagon::new_axial(hexagon.get_q(), hexagon.get_r());

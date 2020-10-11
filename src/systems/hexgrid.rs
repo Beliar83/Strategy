@@ -1,16 +1,22 @@
 use crate::components::hexagon::Direction;
 use crate::components::hexagon::Hexagon;
+use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use crate::components::unit::Unit;
+use crate::legion::entity_has_component;
 use core::cmp::Reverse;
+use gdnative::api::Physics2DDirectSpaceState;
 use gdnative::prelude::*;
 use legion::query::{ComponentFilter, DynamicFilter, EntityFilter, FilterResult, LayoutFilter};
 use legion::storage::{Component, ComponentTypeId};
 use legion::world::{ComponentError, EntityAccessError, EntryRef, WorldId};
-use legion::{maybe_changed, passthrough, Entity, EntityStore, Fetch, IntoQuery, Read, World};
+use legion::{
+    component, maybe_changed, passthrough, Entity, EntityStore, Fetch, IntoQuery, Read, World,
+};
 use priority_queue::PriorityQueue;
 use std::collections::HashMap;
 use std::fs::read;
+use std::iter::FromIterator;
 
 pub fn create_grid(radius: u32, prefab_path: String, node_scale: f32, world: &mut World) {
     let radius = radius as i32;
@@ -118,16 +124,6 @@ pub fn find_path(start: &Hexagon, target: &Hexagon, world: &World) -> Vec<Hexago
     }
 
     path
-}
-
-fn entity_has_component<T: Component>(world: &World, entity: &Entity) -> bool {
-    let entry = match world.entry_ref(*entity) {
-        Ok(entry) => entry,
-        Err(_) => {
-            return false;
-        }
-    };
-    entry.get_component::<T>().is_ok()
 }
 
 #[cfg(test)]

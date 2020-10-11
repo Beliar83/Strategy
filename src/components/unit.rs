@@ -54,7 +54,7 @@ impl Unit {
         }
     }
 
-    pub fn can_move(&self, distance: i32) -> CanMove {
+    pub fn is_in_movement_range(&self, distance: i32) -> CanMove {
         if distance > 0 && self.remaining_range >= distance {
             CanMove::Yes(self.remaining_range - distance)
         } else {
@@ -62,7 +62,7 @@ impl Unit {
         }
     }
 
-    pub fn can_attack(&self, distance: i32) -> bool {
+    pub fn is_in_attack_range(&self, distance: i32) -> bool {
         distance <= self.max_attack_range && distance >= self.min_attack_range
     }
 }
@@ -170,16 +170,16 @@ mod tests {
     }
 
     #[test]
-    pub fn can_move_returns_ok_with_remaining_distance_if_distance_is_below_or_equal_to_remaining_range(
+    pub fn is_in_movement_range_returns_ok_with_remaining_distance_if_distance_is_below_or_equal_to_remaining_range(
     ) {
         let unit = Unit::new(0, 0, 0, 0, 0, 0, 5, 0);
-        let result = unit.can_move(4);
+        let result = unit.is_in_movement_range(4);
         match result {
             CanMove::Yes(remaining_range) => assert_eq!(remaining_range, 1),
             _ => panic!("Expected result of Yes"),
         }
 
-        let result = unit.can_move(5);
+        let result = unit.is_in_movement_range(5);
         match result {
             CanMove::Yes(remaining_range) => assert_eq!(remaining_range, 0),
             _ => panic!("Expected result of Yes"),
@@ -187,9 +187,9 @@ mod tests {
     }
 
     #[test]
-    pub fn can_move_returns_no_if_distance_is_higher_than_remaining_range() {
+    pub fn is_in_movement_range_returns_no_if_distance_is_higher_than_remaining_range() {
         let unit = Unit::new(0, 0, 0, 0, 0, 0, 4, 0);
-        let result = unit.can_move(5);
+        let result = unit.is_in_movement_range(5);
         match result {
             CanMove::No => {}
             _ => panic!("Expected result of No"),
@@ -197,9 +197,9 @@ mod tests {
     }
 
     #[test]
-    pub fn can_move_returns_no_if_distance_is_0() {
+    pub fn is_in_movement_range_returns_no_if_distance_is_0() {
         let unit = Unit::new(0, 0, 0, 0, 0, 0, 4, 0);
-        let result = unit.can_move(0);
+        let result = unit.is_in_movement_range(0);
         match result {
             CanMove::No => {}
             _ => panic!("Expected result of No"),
@@ -207,16 +207,16 @@ mod tests {
     }
 
     #[test]
-    pub fn can_attack_returns_true_if_distance_is_inside_range() {
+    pub fn is_in_attack_range_returns_true_if_distance_is_inside_range() {
         let unit = Unit::new(0, 0, 2, 1, 0, 0, 0, 0);
-        assert!(unit.can_attack(1));
-        assert!(unit.can_attack(2));
+        assert!(unit.is_in_attack_range(1));
+        assert!(unit.is_in_attack_range(2));
     }
 
     #[test]
-    pub fn can_attack_returns_false_if_distance_is_outside_range() {
+    pub fn is_in_attack_range_returns_false_if_distance_is_outside_range() {
         let unit = Unit::new(0, 0, 2, 2, 0, 0, 0, 0);
-        assert!(!unit.can_attack(3));
-        assert!(!unit.can_attack(1));
+        assert!(!unit.is_in_attack_range(3));
+        assert!(!unit.is_in_attack_range(1));
     }
 }
