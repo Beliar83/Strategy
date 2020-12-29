@@ -7,12 +7,9 @@ use crate::systems::hexgrid::get_2d_position_from_hex;
 use dynamic_nodes::create_nodes;
 use gdnative::prelude::*;
 use lazy_static::lazy_static;
-use legion::query::{DynamicFilter, FilterResult, Query};
-use legion::storage::Archetype;
-use legion::world::{EntityAccessError, EntryRef, WorldId};
 use legion::{
-    component, Entity, EntityStore, Fetch, IntoQuery, Read, Resources, Schedule, SystemBuilder,
-    World, Write,
+    component, Entity, EntityStore, IntoQuery, Read, Resources, Schedule, SystemBuilder, World,
+    Write,
 };
 use std::sync::Mutex;
 

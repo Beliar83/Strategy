@@ -1,11 +1,7 @@
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use gdnative::prelude::*;
-use legion::systems::Runnable;
-use legion::world::{ComponentError, Entry};
-use legion::{
-    component, Entity, EntityStore, IntoQuery, Read, Schedule, SystemBuilder, World, Write,
-};
+use legion::{component, Entity, IntoQuery, World};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ManageErrs {

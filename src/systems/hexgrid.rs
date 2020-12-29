@@ -1,25 +1,16 @@
 use crate::components::hexagon::Direction;
 use crate::components::hexagon::Hexagon;
-use crate::components::node_component::NodeComponent;
-use crate::components::node_template::NodeTemplate;
 use crate::components::unit::Unit;
 use crate::legion::entity_has_component;
 use core::cmp::Reverse;
-use gdnative::api::Physics2DDirectSpaceState;
 use gdnative::prelude::*;
-use legion::query::{ComponentFilter, DynamicFilter, EntityFilter, FilterResult, LayoutFilter};
-use legion::storage::{Component, ComponentTypeId};
-use legion::world::{ComponentError, EntityAccessError, EntryRef, WorldId};
-use legion::{
-    component, maybe_changed, passthrough, Entity, EntityStore, Fetch, IntoQuery, Read, World,
-};
+use legion::{Entity, IntoQuery, World};
 use priority_queue::PriorityQueue;
 use std::collections::HashMap;
-use std::fs::read;
-use std::iter::FromIterator;
 
-pub fn create_grid(radius: u32, prefab_path: String, node_scale: f32, world: &mut World) {
+pub fn create_grid(radius: u32) -> Vec<Hexagon> {
     let radius = radius as i32;
+    let mut field = Vec::new();
     for q in -radius..radius + 1 {
         for r in -radius..radius + 1 {
             let hex_position = Hexagon::new_axial(q, r);
@@ -28,16 +19,10 @@ pub fn create_grid(radius: u32, prefab_path: String, node_scale: f32, world: &mu
                 continue;
             }
 
-            world.extend(vec![(
-                hex_position,
-                NodeTemplate {
-                    scene_file: prefab_path.clone(),
-                    scale_x: node_scale,
-                    scale_y: node_scale,
-                },
-            )]);
+            field.push(hex_position);
         }
     }
+    field
 }
 
 pub fn get_2d_position_from_hex(hex: &Hexagon, hexfield_size: i32) -> Vector2 {
@@ -134,102 +119,34 @@ mod tests {
     //noinspection DuplicatedCode
     #[test]
     fn create_grid_creates_grid_of_correct_size() {
-        let mut world = World::new(WorldOptions::default());
+        let world = World::new(WorldOptions::default());
 
-        create_grid(1, "test".to_owned(), 1.5, &mut world);
+        let grid: Vec<Hexagon> = create_grid(1);
+        assert_eq!(grid.len(), 7);
 
-        assert_eq!(Entity::query().iter(&world).count(), 7);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == 0
-                && position_data.get_r() == 0
-                && position_data.get_s() == 0
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == 1
-                && position_data.get_r() == 0
-                && position_data.get_s() == -1
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == 0
-                && position_data.get_r() == 1
-                && position_data.get_s() == -1
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == 0
-                && position_data.get_r() == -1
-                && position_data.get_s() == 1
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == -1
-                && position_data.get_r() == 0
-                && position_data.get_s() == 1
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == -1
-                && position_data.get_r() == 1
-                && position_data.get_s() == 0
-        });
-        assert!(result);
-        let result = Entity::query().iter(&world).any(|entity| {
-            let entry = world.entry_ref(*entity).unwrap();
-            let position_data = entry.get_component::<Hexagon>().unwrap();
-            let node_data = entry.get_component::<NodeTemplate>().unwrap();
-            let error = 0.1;
-            node_data.scene_file == "test"
-                && (node_data.scale_x - 1.5).abs() < error
-                && (node_data.scale_y - 1.5).abs() < error
-                && position_data.get_q() == 1
-                && position_data.get_r() == -1
-                && position_data.get_s() == 0
-        });
-        assert!(result);
+        assert!(grid.iter().any(|position_data| position_data.get_q() == 0
+            && position_data.get_r() == 0
+            && position_data.get_s() == 0));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == 1
+            && position_data.get_r() == 0
+            && position_data.get_s() == -1));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == 0
+            && position_data.get_r() == 1
+            && position_data.get_s() == -1));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == 0
+            && position_data.get_r() == -1
+            && position_data.get_s() == 1));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == -1
+            && position_data.get_r() == 0
+            && position_data.get_s() == 1));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == -1
+            && position_data.get_r() == 1
+            && position_data.get_s() == 0));
+        assert!(grid.iter().any(|position_data| position_data.get_q() == 1
+            && position_data.get_r() == -1
+            && position_data.get_s() == 0));
+
+        assert_eq!(Entity::query().iter(&world).count(), 0);
     }
 
     #[test]

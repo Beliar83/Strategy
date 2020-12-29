@@ -1,14 +1,18 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://GameWorld.gdns" type="Script" id=1]
 [ext_resource path="res://map_ui.gdns" type="Script" id=2]
+[ext_resource path="res://hex_grid.gdns" type="Script" id=3]
 
 [node name="Root" type="Node2D"]
 
 [node name="Camera2D" type="Camera2D" parent="."]
 current = true
 
-[node name="GameWorld" type="Node2D" parent="Camera2D"]
+[node name="Grid" type="Node2D" parent="Camera2D"]
+script = ExtResource( 3 )
+
+[node name="GameWorld" type="Node2D" parent="Camera2D/Grid"]
 z_index = 1
 script = ExtResource( 1 )
 
@@ -70,4 +74,4 @@ text = "End round"
 __meta__ = {
 "_edit_use_anchors_": false
 }
-[connection signal="pressed" from="UILayer/UI/Bottom/HBoxContainer/MarginContainer/Button" to="Camera2D/GameWorld" method="on_new_round"]
+[connection signal="pressed" from="UILayer/UI/Bottom/HBoxContainer/MarginContainer/Button" to="Camera2D/Grid/GameWorld" method="on_new_round"]
