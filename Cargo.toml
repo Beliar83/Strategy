@@ -10,7 +10,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-gdnative = "0.9.0"
+gdnative = "0.9.1"
 legion = "0.3.1" #{ git = "https://github.com/tomgillen/legion.git" }
 lazy_static = "1.4.0"
 crossbeam = "0.7.3"

@@ -1,3 +1,4 @@
+use gdnative::core_types::Vector2;
 use std::hash::Hash;
 
 /// Hexagonal map cube position as describe here: https://www.redblobgames.com/grids/hexagons/#coordinates-cube
@@ -21,6 +22,14 @@ impl Hexagon {
             r,
             s: calculate_axis(q, r),
         }
+    }
+
+    pub fn from_vector2(pos: Vector2, hexfield_size: i32) -> Hexagon {
+        let q = (3_f32.sqrt() / 3_f32 * pos.x - 1_f32 / 3_f32 * pos.y) / (hexfield_size as f32);
+        let r = (2_f32 / 3_f32 * pos.y) / (hexfield_size as f32);
+        let s = -q - r;
+
+        cube_round(q, r, s)
     }
 
     pub fn move_q(&self, length: i32) -> Hexagon {
@@ -81,6 +90,25 @@ impl Hexagon {
 
 fn calculate_axis(axis_1: i32, axis_2: i32) -> i32 {
     -axis_1 - axis_2
+}
+
+fn cube_round(x: f32, y: f32, z: f32) -> Hexagon {
+    let mut rx = x.round();
+    let mut ry = y.round();
+    let mut rz = z.round();
+
+    let x_diff = (rx - x).abs();
+    let y_diff = (ry - y).abs();
+    let z_diff = (rz - z).abs();
+
+    if (x_diff > y_diff) & (x_diff > z_diff) {
+        rx = -ry - rz
+    } else if y_diff > z_diff {
+        ry = -rx - rz
+    } else {
+        rz = -rx - ry
+    }
+    Hexagon::new_cube(rx as i32, ry as i32, rz as i32)
 }
 
 pub enum Direction {

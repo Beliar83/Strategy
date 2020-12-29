@@ -10,6 +10,10 @@ pub struct GameState {
     pub current_player: Option<usize>,
     pub current_path: Vec<Hexagon>,
     pub hexfield_size: i32,
+    pub redraw_grid: bool,
+    pub red_layer: bool,
+    pub green_layer: bool,
+    pub blue_layer: bool,
 }
 
 impl GameState {
@@ -21,10 +25,15 @@ impl GameState {
             current_player: None,
             current_path: Vec::new(),
             hexfield_size: 0,
+            redraw_grid: false,
+            red_layer: true,
+            green_layer: true,
+            blue_layer: true,
         }
     }
 }
 
+#[derive(Clone)]
 pub enum State {
     Waiting,
     Selected(Entity),

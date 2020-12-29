@@ -4,7 +4,6 @@ use crate::components::unit::Unit as UnitComponent;
 use crate::game_state::State;
 use crate::systems::{find_entity_of_instance, with_game_state};
 use gdnative::prelude::*;
-use legion::world::{ComponentError, Entry};
 
 #[derive(NativeClass)]
 #[inherit(Node)]
