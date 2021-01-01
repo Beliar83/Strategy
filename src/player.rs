@@ -1,5 +1,6 @@
 use gdnative::prelude::*;
 
+#[derive(Clone)]
 pub struct Player {
     name: String,
     colour: Color,
