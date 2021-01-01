@@ -67,6 +67,7 @@ impl Unit {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct AttackResult {
     pub actual_damage: i32,
     pub attacker: Unit,

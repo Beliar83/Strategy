@@ -24,9 +24,9 @@ impl Hexagon {
         }
     }
 
-    pub fn from_vector2(pos: Vector2, hexfield_size: i32) -> Hexagon {
-        let q = (3_f32.sqrt() / 3_f32 * pos.x - 1_f32 / 3_f32 * pos.y) / (hexfield_size as f32);
-        let r = (2_f32 / 3_f32 * pos.y) / (hexfield_size as f32);
+    pub fn from_vector2(pos: Vector2, hexfield_size: f32) -> Hexagon {
+        let q = (3_f32.sqrt() / 3_f32 * pos.x - 1_f32 / 3_f32 * pos.y) / (hexfield_size);
+        let r = (2_f32 / 3_f32 * pos.y) / (hexfield_size);
         let s = -q - r;
 
         cube_round(q, r, s)

@@ -1,7 +1,9 @@
 use crate::components::node_component::NodeComponent;
 use crate::components::node_template::NodeTemplate;
 use gdnative::prelude::*;
-use legion::{component, Entity, IntoQuery, World};
+use legion::systems::CommandBuffer;
+use legion::{component, system, Entity, World};
+use std::process::Command;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ManageErrs {
@@ -9,38 +11,46 @@ pub enum ManageErrs {
     RootClassNotSpatial(String),
 }
 
-pub fn create_nodes(world: &mut World, root: &Node2D) {
-    let entity_data: Vec<(Entity, NodeTemplate)> = <&NodeTemplate>::query()
-        .filter(!component::<NodeComponent>())
-        .iter_chunks(world)
-        .flat_map(|chunk| chunk.into_iter_entities())
-        .map(|data| (data.0, data.1.clone()))
-        .collect();
-    for (entity, node_data) in entity_data {
-        let template = load_scene(&node_data.scene_file);
+#[system(for_each)]
+#[filter(!component::<NodeComponent>())]
+pub fn create_node(
+    cmd: &mut CommandBuffer,
+    #[state] unit_node: &Ref<Node2D>,
+    entity: &Entity,
+    template_data: &NodeTemplate,
+) {
+    let units_node = match unsafe { unit_node.assume_safe_if_sane() } {
+        Some(node) => node,
+        None => return,
+    };
 
-        let template = if let Some(template) = &template {
-            template
-        } else {
-            godot_print!("Could not load scene: {}", node_data.scene_file);
-            continue;
-        };
+    let template = load_scene(&template_data.scene_file);
 
-        match instance_scene::<Node2D>(template) {
-            Ok(node2d) => {
-                let node2d: Ref<Node2D> = node2d.into_shared();
-                unsafe {
-                    let node2d = node2d.assume_safe_if_sane().unwrap();
-                    node2d.set_z_as_relative(false);
-                    node2d.set_scale(Vector2::new(node_data.scale_x, node_data.scale_y));
-                }
-                root.add_child(node2d, false);
+    let template = if let Some(template) = &template {
+        template
+    } else {
+        godot_print!("Could not load scene: {}", &template_data.scene_file);
+        return;
+    };
 
+    match instance_scene::<Node2D>(template) {
+        Ok(node2d) => {
+            let node2d: Ref<Node2D> = node2d.into_shared();
+            unsafe {
+                let node2d = node2d.assume_safe_if_sane().unwrap();
+                node2d.set_z_index(template_data.z_index);
+                node2d.set_z_as_relative(false);
+                node2d.set_scale(Vector2::new(template_data.scale_x, template_data.scale_y));
+            }
+            units_node.add_child(node2d, false);
+
+            let entity = *entity;
+            cmd.exec_mut(move |world| {
                 let mut entry = world.entry(entity).unwrap();
                 entry.add_component(NodeComponent { node: node2d });
-            }
-            Err(err) => godot_print!("Could not instance Child : {:?}", err),
+            })
         }
+        Err(err) => godot_print!("Could not instance Child : {:?}", err),
     }
 }
 

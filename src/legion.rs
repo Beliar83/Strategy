@@ -1,7 +1,7 @@
 use legion::storage::Component;
-use legion::{Entity, EntityStore, World};
+use legion::{Entity, EntityStore};
 
-pub fn entity_has_component<T: Component>(world: &World, entity: &Entity) -> bool {
+pub fn entity_has_component<T: Component, S: EntityStore>(world: &S, entity: &Entity) -> bool {
     let entry = match world.entry_ref(*entity) {
         Ok(entry) => entry,
         Err(_) => {
