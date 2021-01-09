@@ -15,6 +15,7 @@ use dynamic_nodes::create_node_system;
 use gdnative::api::input_event_mouse::InputEventMouse;
 use gdnative::api::input_event_mouse_button::InputEventMouseButton;
 use gdnative::api::input_event_mouse_motion::InputEventMouseMotion;
+use gdnative::api::Camera2D;
 use gdnative::api::GlobalConstants;
 use gdnative::api::Physics2DDirectSpaceState;
 use gdnative::prelude::*;
@@ -23,7 +24,6 @@ use legion::systems::CommandBuffer;
 use legion::world::{EntryRef, SubWorld};
 use legion::{
     component, system, Entity, EntityStore, IntoQuery, Resources, Schedule, SystemBuilder, World,
-    Write,
 };
 use std::borrow::Borrow;
 use std::collections::vec_deque::VecDeque;
@@ -32,6 +32,7 @@ pub mod dynamic_nodes;
 pub mod hexgrid;
 
 pub struct WorldNode(Ref<Node2D>);
+pub struct MainCamera(TRef<'static, Camera2D>);
 pub struct UINode(TRef<'static, Control>);
 pub struct HexfieldSize(pub f32);
 pub struct Delta(pub f64);
@@ -152,6 +153,11 @@ fn handle_attack_result(
     }
 }
 
+#[system]
+pub fn finalize(#[resource] state: &mut GameState) {
+    state.update_fields = false;
+}
+
 #[system(par_for_each)]
 #[read_component(Hexagon)]
 #[read_component(Unit)]
@@ -226,7 +232,7 @@ pub fn draw_grid(
     let node = unsafe { node.0.assume_safe() };
 
     let viewport: Rect2 = node.get_viewport_rect();
-    let viewport = viewport.scale(1.5_f32, 1.5_f32);
+    let viewport = viewport.scale(1.1_f32, 1.1_f32);
     let global_transf: Transform2D = node.get_global_transform_with_canvas();
 
     let width = 3.0_f32.sqrt() * hexfield_size;
@@ -629,6 +635,8 @@ impl UpdateNodes {
             .add_system(update_field_system())
             .add_thread_local(create_node_system(world_node))
             .add_thread_local(update_ui_system())
+            .flush()
+            .add_system(finalize_system())
             .build();
         let draw_schedule = Schedule::builder()
             .add_system(draw_grid_system())
@@ -656,7 +664,13 @@ impl UpdateNodes {
         state.state = State::NewRound;
     }
 
-    pub fn execute(&mut self, root: &Node2D, ui_node: TRef<'static, Control>, delta: f64) {
+    pub fn execute(
+        &mut self,
+        root: &Node2D,
+        ui_node: TRef<'static, Control>,
+        camera_node: TRef<'static, Camera2D>,
+        delta: f64,
+    ) {
         with_world(|mut world| {
             self.resources.insert(Delta(delta));
             if let Some(world) = root.get_world_2d() {
@@ -665,309 +679,368 @@ impl UpdateNodes {
                 }
             }
             self.resources.insert(UINode(ui_node));
+            self.resources.insert(MainCamera(camera_node));
 
             self.process_schedule
                 .execute(&mut world, &mut self.resources);
-            let mut state: &mut GameState = &mut *self.resources.get_mut::<GameState>().unwrap();
-            state.update_fields = false;
-            let hexfield_size = self.resources.get::<HexfieldSize>().unwrap().0;
 
             while let Some::<Ref<InputEvent>>(event) = self.input_queue.pop_front() {
                 if let Some(event) = event.clone().cast::<InputEventMouse>() {
-                    let event = unsafe { event.assume_safe() };
-                    let screen_size = root.get_viewport_rect();
-                    let test = event.position()
-                        - Vector2::new(screen_size.width(), screen_size.height()) / 2_f32;
-                    let hex = Hexagon::from_vector2(test, hexfield_size);
-                    if let Some(_event) = event.cast::<InputEventMouseMotion>() {
-                        if match state.hovered_hexagon {
-                            Some(hovered_hexagon) => {
-                                if hex != hovered_hexagon {
-                                    let value_dict = Dictionary::new();
-                                    value_dict.insert("q", hovered_hexagon.get_q());
-                                    value_dict.insert("r", hovered_hexagon.get_r());
-                                    let value_dict = value_dict.owned_to_variant();
-                                    unsafe {
-                                        state.current_path = Vec::new();
-                                        root.call_deferred(
-                                            "emit_signal",
-                                            &[
-                                                GodotString::from_str("hex_mouse_exited")
-                                                    .to_variant(),
-                                                value_dict,
-                                            ],
-                                        );
-                                    }
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            None => true,
-                        } {
-                            UpdateNodes::update_path(world, state, &hex);
-
-                            let value_dict = Dictionary::new();
-                            value_dict.insert("q", hex.get_q());
-                            value_dict.insert("r", hex.get_r());
-                            let value_dict = value_dict.owned_to_variant();
-                            state.hovered_hexagon = Some(hex);
-                            state.redraw_grid = true;
-                            unsafe {
-                                root.call_deferred(
-                                    "emit_signal",
-                                    &[
-                                        GodotString::from_str("hex_mouse_entered").to_variant(),
-                                        value_dict,
-                                    ],
-                                );
-                            }
-                        }
+                    let mut event = unsafe { event.assume_safe() };
+                    let button_index = if event.is_pressed() {
+                        Some(event.button_mask())
+                    } else {
+                        None
+                    };
+                    if let Some(event) = event.cast::<InputEventMouseMotion>() {
+                        self.handle_mouse_motion(root, world, event);
                     } else if let Some(event) = event.cast::<InputEventMouseButton>() {
-                        if !event.is_pressed() {
-                            return;
-                        }
-                        let value_dict = Dictionary::new();
-                        value_dict.insert("q", hex.get_q());
-                        value_dict.insert("r", hex.get_r());
-                        let value_dict = value_dict.owned_to_variant();
-
-                        if event.button_index() == GlobalConstants::BUTTON_RIGHT {
-                            set_state(state, State::Waiting);
-                            unsafe {
-                                root.call_deferred(
-                                    "emit_signal",
-                                    &[
-                                        GodotString::from_str("hex_right_clicked").to_variant(),
-                                        value_dict,
-                                    ],
-                                );
-                            }
-                        } else if event.button_index() == GlobalConstants::BUTTON_LEFT {
-                            let mut possible_states = Vec::new();
-
-                            let entities_at_hexagon = get_entities_at_hexagon(&hex, world);
-
-                            if entities_at_hexagon.is_empty() {
-                                if let State::Selected(selected_entity) = state.state {
-                                    let selected_hexagon = {
-                                        let selected_entry =
-                                            world.entry_ref(selected_entity).unwrap();
-                                        let current_player_id = match state.current_player {
-                                            None => {
-                                                let message = "State has no active player.";
-                                                godot_error!("{}", message);
-                                                panic!(message);
-                                            }
-                                            Some(player) => player,
-                                        };
-                                        let selected_player_id =
-                                            match get_player_of_entity(&selected_entry) {
-                                                None => {
-                                                    let message =
-                                                        "Selected unit has no assigned player";
-                                                    godot_error!("{}", message);
-                                                    panic!(message);
-                                                }
-                                                Some(id) => id,
-                                            };
-
-                                        if current_player_id != selected_player_id {
-                                            return;
-                                        }
-                                        match selected_entry.get_component::<Hexagon>() {
-                                            Err(_) => {
-                                                let message =
-                                                    "Selected entity has no hexagon component.";
-                                                godot_error!("{}", message);
-                                                panic!(message);
-                                            }
-                                            Ok(hexagon) => *hexagon,
-                                        }
-                                    };
-                                    let path = find_path(&selected_hexagon, &hex, world);
-
-                                    if path.is_empty() {
-                                        godot_warn!("Path from entity to target not found.",);
-                                    } else {
-                                        possible_states.push(State::Moving(
-                                            selected_entity,
-                                            VecDeque::from(path),
-                                            0f64,
-                                        ));
-                                    }
-                                }
-                            } else {
-                                for entity in entities_at_hexagon {
-                                    possible_states.push(State::Selected(entity));
-                                    match state.state {
-                                        State::NewRound => {}
-                                        State::Startup => {}
-                                        State::Waiting => {}
-                                        State::Selected(selected_entity) => {
-                                            if world.contains(selected_entity) {
-                                                if selected_entity != entity {
-                                                    let clicked_unit = {
-                                                        let clicked_entry =
-                                                            world.entry(entity).unwrap();
-                                                        match clicked_entry.get_component::<Unit>()
-                                                        {
-                                                            Ok(unit) => Some(*unit),
-                                                            Err(_) => None,
-                                                        }
-                                                    };
-
-                                                    let current_player_id =
-                                                        match state.current_player {
-                                                            None => {
-                                                                let message =
-                                                                    "State has no active player.";
-                                                                godot_error!("{}", message);
-                                                                panic!(message);
-                                                            }
-                                                            Some(player) => player,
-                                                        };
-                                                    let selected_entry =
-                                                        world.entry_ref(selected_entity).unwrap();
-                                                    let selected_player_id =
-                                                        match get_player_of_entity(&selected_entry)
-                                                        {
-                                                            None => {
-                                                                let message = "Selected unit has no assigned player";
-                                                                godot_error!("{}", message);
-                                                                panic!(message);
-                                                            }
-                                                            Some(id) => id,
-                                                        };
-
-                                                    match clicked_unit {
-                                                        Some(_) => {
-                                                            if current_player_id
-                                                                != selected_player_id
-                                                            {
-                                                                return;
-                                                            }
-                                                            let is_visible = match root
-                                                                .get_world_2d()
-                                                            {
-                                                                None => false,
-                                                                Some(godot_world) => {
-                                                                    let godot_world = unsafe {
-                                                                        godot_world.assume_safe()
-                                                                    };
-                                                                    match { godot_world.direct_space_state() } {
-                                                                                None => false,
-                                                                                Some(physic_state) => {
-                                                                                    is_hexagon_visible_for_attack(
-                                                                                        &physic_state,
-                                                                                        world,
-                                                                                        hexfield_size,
-                                                                                        selected_entity,
-                                                                                        hex,
-                                                                                    )
-                                                                                }
-                                                                            }
-                                                                }
-                                                            };
-
-                                                            if is_visible {
-                                                                possible_states.push(
-                                                                    State::Attacking(
-                                                                        selected_entity,
-                                                                        entity,
-                                                                    ),
-                                                                );
-                                                            }
-                                                        }
-                                                        None => {
-                                                            let selected_hexagon = {
-                                                                if current_player_id
-                                                                    != selected_player_id
-                                                                {
-                                                                    return;
-                                                                }
-                                                                match selected_entry
-                                                                    .get_component::<Hexagon>()
-                                                                {
-                                                                    Err(_) => {
-                                                                        let message = "Selected entity has no hexagon component.";
-                                                                        godot_error!("{}", message);
-                                                                        panic!(message);
-                                                                    }
-                                                                    Ok(hexagon) => *hexagon,
-                                                                }
-                                                            };
-                                                            let path = find_path(
-                                                                &selected_hexagon,
-                                                                &hex,
-                                                                world,
-                                                            );
-
-                                                            if path.is_empty() {
-                                                                godot_warn!(
-                                                    "Path from entity to target not found.",
-                                                );
-                                                            } else {
-                                                                possible_states.push(
-                                                                    State::Moving(
-                                                                        selected_entity,
-                                                                        VecDeque::from(path),
-                                                                        0f64,
-                                                                    ),
-                                                                );
-                                                            }
-                                                        }
-                                                    }
-                                                } else {
-                                                }
-                                            }
-                                        }
-                                        State::Attacking(_, _) => {}
-                                        State::Moving(_, _, _) => {}
-                                    }
-                                }
-                            }
-
-                            match possible_states.last() {
-                                Some(last_state) => {
-                                    set_state(state, last_state.clone());
-                                }
-                                None => {
-                                    set_state(state, State::Waiting);
-                                }
-                            }
-
-                            unsafe {
-                                root.call_deferred(
-                                    "emit_signal",
-                                    &[
-                                        GodotString::from_str("hex_left_clicked").to_variant(),
-                                        value_dict,
-                                    ],
-                                );
+                        if let Some(button_index) = button_index {
+                            if button_index == GlobalConstants::BUTTON_MASK_RIGHT {
+                                self.handle_right_click(root, event)
+                            } else if button_index == GlobalConstants::BUTTON_MASK_LEFT {
+                                self.handle_left_click(root, world, event)
                             }
                         }
                     }
                 } else if let Some(event) = event.clone().cast::<InputEventKey>() {
+                    let mut state: &mut GameState =
+                        &mut *self.resources.get_mut::<GameState>().unwrap();
                     let event: TRef<'_, InputEventKey> = unsafe { event.assume_safe() };
                     if !event.is_echo() && event.is_pressed() {
                         let scancode = event.scancode();
-                        if scancode == GlobalConstants::KEY_R {
-                            state.red_layer = !state.red_layer;
-                            state.redraw_grid = true;
-                        }
-                        if scancode == GlobalConstants::KEY_G {
-                            state.green_layer = !state.green_layer;
-                            state.redraw_grid = true;
-                        }
-                        if scancode == GlobalConstants::KEY_B {
-                            state.blue_layer = !state.blue_layer;
-                            state.redraw_grid = true;
+                        match scancode {
+                            GlobalConstants::KEY_R => {
+                                state.red_layer = !state.red_layer;
+                                state.redraw_grid = true;
+                            }
+                            GlobalConstants::KEY_G => {
+                                state.green_layer = !state.green_layer;
+                                state.redraw_grid = true;
+                            }
+                            GlobalConstants::KEY_B => {
+                                state.blue_layer = !state.blue_layer;
+                                state.redraw_grid = true;
+                            }
+                            GlobalConstants::KEY_H => match self.resources.get::<MainCamera>() {
+                                None => {}
+                                Some(camera) => {
+                                    let camera = camera.0;
+                                    camera.set_position(Vector2::zero());
+                                    match root.get_viewport() {
+                                        None => {}
+                                        Some(viewport) => {
+                                            let viewport = unsafe { viewport.assume_safe() };
+                                            viewport.warp_mouse(viewport.get_mouse_position())
+                                        }
+                                    }
+                                }
+                            },
+                            _ => {}
                         }
                     }
                 }
             }
         });
+    }
+
+    fn handle_left_click(
+        &mut self,
+        root: &Node2D,
+        mut world: &mut World,
+        event: TRef<'_, InputEventMouseButton>,
+    ) {
+        let camera = match self.resources.get_mut::<MainCamera>() {
+            None => {
+                return;
+            }
+            Some(camera) => camera.0,
+        };
+        let mut mouse_pos = UpdateNodes::to_view_pos(&camera, event.global_position());
+        let mut state: &mut GameState = &mut *self.resources.get_mut::<GameState>().unwrap();
+        let hexfield_size = self.resources.get::<HexfieldSize>().unwrap().0;
+        let hex = Hexagon::from_vector2(mouse_pos, hexfield_size);
+        let value_dict = Dictionary::new();
+        value_dict.insert("q", hex.get_q());
+        value_dict.insert("r", hex.get_r());
+        let value_dict = value_dict.owned_to_variant();
+        let mut possible_states = Vec::new();
+
+        let entities_at_hexagon = get_entities_at_hexagon(&hex, world);
+
+        if entities_at_hexagon.is_empty() {
+            if let State::Selected(selected_entity) = state.state {
+                let selected_hexagon = {
+                    let selected_entry = world.entry_ref(selected_entity).unwrap();
+                    let current_player_id = match state.current_player {
+                        None => {
+                            let message = "State has no active player.";
+                            godot_error!("{}", message);
+                            panic!(message);
+                        }
+                        Some(player) => player,
+                    };
+                    let selected_player_id = match get_player_of_entity(&selected_entry) {
+                        None => {
+                            let message = "Selected unit has no assigned player";
+                            godot_error!("{}", message);
+                            panic!(message);
+                        }
+                        Some(id) => id,
+                    };
+
+                    if current_player_id != selected_player_id {
+                        return;
+                    }
+                    match selected_entry.get_component::<Hexagon>() {
+                        Err(_) => {
+                            let message = "Selected entity has no hexagon component.";
+                            godot_error!("{}", message);
+                            panic!(message);
+                        }
+                        Ok(hexagon) => *hexagon,
+                    }
+                };
+                let path = find_path(&selected_hexagon, &hex, world);
+
+                if path.is_empty() {
+                    godot_warn!("Path from entity to target not found.",);
+                } else {
+                    possible_states.push(State::Moving(
+                        selected_entity,
+                        VecDeque::from(path),
+                        0f64,
+                    ));
+                }
+            }
+        } else {
+            for entity in entities_at_hexagon {
+                possible_states.push(State::Selected(entity));
+                match state.state {
+                    State::NewRound => {}
+                    State::Startup => {}
+                    State::Waiting => {}
+                    State::Selected(selected_entity) => {
+                        if world.contains(selected_entity) {
+                            if selected_entity != entity {
+                                let clicked_unit = {
+                                    let clicked_entry = world.entry(entity).unwrap();
+                                    match clicked_entry.get_component::<Unit>() {
+                                        Ok(unit) => Some(*unit),
+                                        Err(_) => None,
+                                    }
+                                };
+
+                                let current_player_id = match state.current_player {
+                                    None => {
+                                        let message = "State has no active player.";
+                                        godot_error!("{}", message);
+                                        panic!(message);
+                                    }
+                                    Some(player) => player,
+                                };
+                                let selected_entry = world.entry_ref(selected_entity).unwrap();
+                                let selected_player_id = match get_player_of_entity(&selected_entry)
+                                {
+                                    None => {
+                                        let message = "Selected unit has no assigned player";
+                                        godot_error!("{}", message);
+                                        panic!(message);
+                                    }
+                                    Some(id) => id,
+                                };
+
+                                match clicked_unit {
+                                    Some(_) => {
+                                        if current_player_id != selected_player_id {
+                                            return;
+                                        }
+                                        let is_visible = match root.get_world_2d() {
+                                            None => false,
+                                            Some(godot_world) => {
+                                                let godot_world =
+                                                    unsafe { godot_world.assume_safe() };
+                                                match { godot_world.direct_space_state() } {
+                                                    None => false,
+                                                    Some(physic_state) => {
+                                                        is_hexagon_visible_for_attack(
+                                                            &physic_state,
+                                                            world,
+                                                            hexfield_size,
+                                                            selected_entity,
+                                                            hex,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        };
+
+                                        if is_visible {
+                                            possible_states
+                                                .push(State::Attacking(selected_entity, entity));
+                                        }
+                                    }
+                                    None => {
+                                        let selected_hexagon = {
+                                            if current_player_id != selected_player_id {
+                                                return;
+                                            }
+                                            match selected_entry.get_component::<Hexagon>() {
+                                                Err(_) => {
+                                                    let message =
+                                                        "Selected entity has no hexagon component.";
+                                                    godot_error!("{}", message);
+                                                    panic!(message);
+                                                }
+                                                Ok(hexagon) => *hexagon,
+                                            }
+                                        };
+                                        let path = find_path(&selected_hexagon, &hex, world);
+
+                                        if path.is_empty() {
+                                            godot_warn!("Path from entity to target not found.",);
+                                        } else {
+                                            possible_states.push(State::Moving(
+                                                selected_entity,
+                                                VecDeque::from(path),
+                                                0f64,
+                                            ));
+                                        }
+                                    }
+                                }
+                            } else {
+                            }
+                        }
+                    }
+                    State::Attacking(_, _) => {}
+                    State::Moving(_, _, _) => {}
+                }
+            }
+        }
+
+        match possible_states.last() {
+            Some(last_state) => {
+                set_state(state, last_state.clone());
+            }
+            None => {
+                set_state(state, State::Waiting);
+            }
+        }
+
+        unsafe {
+            root.call_deferred(
+                "emit_signal",
+                &[
+                    GodotString::from_str("hex_left_clicked").to_variant(),
+                    value_dict,
+                ],
+            );
+        }
+    }
+
+    fn handle_right_click(&mut self, root: &Node2D, event: TRef<'_, InputEventMouseButton>) {
+        let camera = match self.resources.get_mut::<MainCamera>() {
+            None => {
+                return;
+            }
+            Some(camera) => camera.0,
+        };
+        let mut mouse_pos = UpdateNodes::to_view_pos(&camera, event.global_position());
+        let hexfield_size = self.resources.get::<HexfieldSize>().unwrap().0;
+        let hex = Hexagon::from_vector2(mouse_pos, hexfield_size);
+        let value_dict = Dictionary::new();
+        value_dict.insert("q", hex.get_q());
+        value_dict.insert("r", hex.get_r());
+        let value_dict = value_dict.owned_to_variant();
+        let mut state: &mut GameState = &mut *self.resources.get_mut::<GameState>().unwrap();
+        set_state(state, State::Waiting);
+        unsafe {
+            root.call_deferred(
+                "emit_signal",
+                &[
+                    GodotString::from_str("hex_right_clicked").to_variant(),
+                    value_dict,
+                ],
+            );
+        }
+    }
+
+    fn handle_mouse_motion(
+        &mut self,
+        root: &Node2D,
+        mut world: &mut World,
+        event: TRef<'_, InputEventMouseMotion>,
+    ) {
+        let camera = match self.resources.get_mut::<MainCamera>() {
+            None => {
+                return;
+            }
+            Some(camera) => camera.0,
+        };
+        let button_mask = event.button_mask();
+        let mouse_pos = UpdateNodes::to_view_pos(&camera, event.global_position());
+        let mut state: &mut GameState = &mut *self.resources.get_mut::<GameState>().unwrap();
+
+        match button_mask {
+            GlobalConstants::BUTTON_MASK_MIDDLE => {
+                let pos = event.relative();
+                camera.move_local_x((-pos.x).into(), false);
+                camera.move_local_y((-pos.y).into(), false);
+            }
+            _ => {
+                let hexfield_size = self.resources.get::<HexfieldSize>().unwrap().0;
+                let hex = Hexagon::from_vector2(mouse_pos, hexfield_size);
+                if match state.hovered_hexagon {
+                    Some(hovered_hexagon) => {
+                        if hex != hovered_hexagon {
+                            let value_dict = Dictionary::new();
+                            value_dict.insert("q", hovered_hexagon.get_q());
+                            value_dict.insert("r", hovered_hexagon.get_r());
+                            let value_dict = value_dict.owned_to_variant();
+                            unsafe {
+                                state.current_path = Vec::new();
+                                root.call_deferred(
+                                    "emit_signal",
+                                    &[
+                                        GodotString::from_str("hex_mouse_exited").to_variant(),
+                                        value_dict,
+                                    ],
+                                );
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    None => true,
+                } {
+                    UpdateNodes::update_path(world, state, &hex);
+
+                    let value_dict = Dictionary::new();
+                    value_dict.insert("q", hex.get_q());
+                    value_dict.insert("r", hex.get_r());
+                    let value_dict = value_dict.owned_to_variant();
+                    state.hovered_hexagon = Some(hex);
+                    state.redraw_grid = true;
+                    unsafe {
+                        root.call_deferred(
+                            "emit_signal",
+                            &[
+                                GodotString::from_str("hex_mouse_entered").to_variant(),
+                                value_dict,
+                            ],
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn to_view_pos(camera: &TRef<'_, Camera2D>, mut mouse_pos: Vector2) -> Vector2 {
+        let global_transf: Transform2D = camera.get_global_transform_with_canvas();
+        mouse_pos.x -= global_transf.m31;
+        mouse_pos.y -= global_transf.m32;
+        camera.to_global(mouse_pos)
     }
 
     fn update_path<S: EntityStore>(world: &S, mut state: &mut GameState, hex: &Hexagon) {

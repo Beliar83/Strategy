@@ -2,6 +2,7 @@ use crate::components::node_component::NodeComponent;
 use crate::systems::{with_world, UpdateNodes};
 use crossbeam::channel::Receiver;
 use crossbeam::crossbeam_channel;
+use gdnative::api::Camera2D;
 use gdnative::prelude::*;
 use legion::world::Event;
 use legion::{component, Entity};
@@ -16,6 +17,8 @@ pub struct GameWorld {
     node_entity: HashMap<Entity, Ref<Node2D>>,
     #[property]
     ui_node: Option<NodePath>,
+    #[property]
+    camera_node: Option<NodePath>,
 }
 
 #[methods]
@@ -30,6 +33,7 @@ impl GameWorld {
             event_receiver: receiver,
             node_entity: HashMap::new(),
             ui_node: None,
+            camera_node: None,
         }
     }
 
@@ -77,7 +81,7 @@ impl GameWorld {
 
         let ui_node = match &self.ui_node {
             None => {
-                godot_error!("UI node is not set");
+                godot_error!("ui_node is not set");
                 return;
             }
             Some(node) => match owner.get_node(node.to_godot_string()) {
@@ -95,7 +99,27 @@ impl GameWorld {
             },
         };
 
-        self.process.execute(&owner, ui_node, delta);
+        let camera_node = match &self.camera_node {
+            None => {
+                godot_error!("camera_node is not set");
+                return;
+            }
+            Some(node) => match owner.get_node(node.to_godot_string()) {
+                None => {
+                    godot_error!("No node found at camera_node path");
+                    return;
+                }
+                Some(node) => match unsafe { node.assume_safe().cast::<Camera2D>() } {
+                    None => {
+                        godot_error!("Node at camera_node path is not a Control");
+                        return;
+                    }
+                    Some(node) => node,
+                },
+            },
+        };
+
+        self.process.execute(&owner, ui_node, camera_node, delta);
         owner.update();
     }
 
