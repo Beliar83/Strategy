@@ -3,11 +3,10 @@ use crate::components::hexagon::Hexagon;
 use crate::components::node_component::NodeComponent;
 use crate::components::player::Player;
 use crate::components::unit::Unit;
-use crate::legion::entity_has_component;
+use bevy_ecs::prelude::{Entity, World};
 use core::cmp::Reverse;
 use gdnative::api::Physics2DDirectSpaceState;
 use gdnative::prelude::*;
-use legion::{Entity, EntityStore, IntoQuery};
 use priority_queue::PriorityQueue;
 use std::collections::HashMap;
 
@@ -49,25 +48,21 @@ pub fn get_neighbours(hexagon: &Hexagon) -> Vec<Hexagon> {
     ]
 }
 
-pub fn get_entities_at_hexagon<S: EntityStore>(hexagon: &Hexagon, world: &S) -> Vec<Entity> {
-    <&Hexagon>::query()
-        .iter_chunks(world)
-        .flat_map(|chunk| {
-            chunk.into_iter_entities().filter_map(|tuple| {
-                if tuple.1 == hexagon {
-                    Some(tuple.0)
-                } else {
-                    None
-                }
-            })
-        })
+pub fn get_entities_at_hexagon(world: &mut World, hexagon: &Hexagon) -> Vec<Entity> {
+    let mut hexagon_query = world.query::<(Entity, &Hexagon)>();
+
+    hexagon_query
+        .iter(world)
+        .filter(|pair| *pair.1 == *hexagon)
+        .map(|(entity, _)| entity)
         .collect()
 }
 
-pub fn find_path<S: EntityStore>(start: &Hexagon, target: &Hexagon, world: &S) -> Vec<Hexagon> {
-    match get_entities_at_hexagon(target, world)
+pub fn find_path(world: &mut World, start: &Hexagon, target: &Hexagon) -> Vec<Hexagon> {
+    let mut unit_query = world.query::<&Unit>();
+    match get_entities_at_hexagon(world, target)
         .iter()
-        .find(|entity| entity_has_component::<Unit, S>(world, entity))
+        .find(|entity| unit_query.get(world, **entity).is_ok())
     {
         None => {}
         Some(_) => return Vec::new(),
@@ -84,9 +79,9 @@ pub fn find_path<S: EntityStore>(start: &Hexagon, target: &Hexagon, world: &S) -
             break;
         }
         for next in get_neighbours(&current) {
-            if get_entities_at_hexagon(&next, world)
+            if get_entities_at_hexagon(world, &next)
                 .iter()
-                .any(|entity| entity_has_component::<Unit, S>(world, entity))
+                .any(|entity| unit_query.get(world, *entity).is_ok())
             {
                 continue;
             }
@@ -117,109 +112,74 @@ pub fn find_path<S: EntityStore>(start: &Hexagon, target: &Hexagon, world: &S) -
     path
 }
 
-pub fn is_hexagon_visible_for_attack<S: EntityStore>(
-    physic_state: &Ref<Physics2DDirectSpaceState>,
-    legion_world: &S,
+pub fn is_hexagon_visible_for_attack(
+    world: &mut World,
+    physic_state: TRef<'_, Physics2DDirectSpaceState>,
     hexfield_size: f32,
     selected_entity: Entity,
     target_hexagon: Hexagon,
 ) -> bool {
-    let (selected_unit, selected_hexagon, select_unit_player) = {
-        let entry = legion_world.entry_ref(selected_entity).unwrap();
-        let hexagon = match entry.get_component::<Hexagon>() {
-            Err(_) => {
-                return false;
-            }
-            Ok(hexagon) => *hexagon,
+    let mut unit_query = world.query::<(&Unit, &Player)>();
+    let mut hexagon_query = world.query::<(Entity, &Hexagon)>();
+    let mut node_query = world.query::<&NodeComponent>();
+
+    let (selected_unit, select_unit_player, selected_hexagon) = {
+        let (selected_unit, select_unit_player) = match unit_query.get(world, selected_entity) {
+            Ok(data) => data,
+            Err(_) => return false,
         };
 
-        let unit = match entry.get_component::<Unit>() {
-            Err(_) => {
-                return false;
-            }
-            Ok(unit) => *unit,
+        let selected_hexagon = match hexagon_query.get(world, selected_entity) {
+            Ok(data) => data.1,
+            Err(_) => return false,
         };
-
-        let player = match entry.get_component::<Player>() {
-            Err(_) => {
-                return false;
-            }
-            Ok(player) => *player,
-        };
-
-        (unit, hexagon, player)
+        (*selected_unit, *select_unit_player, *selected_hexagon)
     };
-    if selected_unit.is_in_attack_range(selected_hexagon.distance_to(&target_hexagon)) {
-        let entities_at_target = get_entities_at_hexagon(&target_hexagon, legion_world);
-        let mut target_entity = None;
-        for entity in &entities_at_target {
-            let entry = match legion_world.entry_ref(*entity) {
-                Err(_) => {
-                    continue;
-                }
-                Ok(entry) => entry,
-            };
-            match entry.get_component::<Unit>() {
-                Ok(_) => {
-                    target_entity = Some(entity);
-                    break;
-                }
-                Err(_) => continue,
-            }
-        }
 
-        let same_player = match target_entity {
-            None => false,
-            Some(e) => match legion_world.entry_ref(*e) {
-                Err(_) => false,
-                Ok(e) => match e.get_component::<Player>() {
-                    Err(_) => false,
-                    Ok(player) => *player == select_unit_player,
-                },
-            },
+    if selected_unit.is_in_attack_range(selected_hexagon.distance_to(&target_hexagon)) {
+        let entities_at_target = get_entities_at_hexagon(world, &target_hexagon);
+        let target_entity = entities_at_target
+            .iter()
+            .find(|entity| unit_query.get(world, **entity).is_ok());
+
+        let target_entity = match target_entity {
+            Some(entity) => entity,
+            None => return false,
         };
+
+        let (_, player) = match unit_query.get(world, *target_entity) {
+            Ok(data) => data,
+            Err(_) => return false,
+        };
+
+        let same_player = *player == select_unit_player;
 
         if !same_player {
-            let physic_state = unsafe { physic_state.assume_safe() };
             let self_position = get_2d_position_from_hex(&target_hexagon, hexfield_size);
             let selected_position = get_2d_position_from_hex(&selected_hexagon, hexfield_size);
 
             let exclude = VariantArray::new();
 
             for entity in entities_at_target {
-                let entry = match legion_world.entry_ref(entity) {
-                    Err(_) => continue,
-                    Ok(e) => e,
-                };
-                match entry.get_component::<NodeComponent>() {
-                    Ok(n) => {
-                        unsafe {
-                            let node = n.node.assume_safe();
-                            if node.has_meta("is_field") && node.get_meta("is_field").to_bool() {
-                                exclude.push(node);
-                            }
-                        };
-                    }
+                let node = match node_query.get(world, entity) {
+                    Ok(node) => node,
                     Err(_) => continue,
                 };
+                let node = node.get_instance();
+                if node.has_meta("is_field") && node.get_meta("is_field").to_bool() {
+                    exclude.push(node);
+                }
             }
 
-            for entity in get_entities_at_hexagon(&selected_hexagon, legion_world) {
-                let entry = match legion_world.entry_ref(entity) {
-                    Err(_) => continue,
-                    Ok(e) => e,
-                };
-                match entry.get_component::<NodeComponent>() {
-                    Ok(n) => {
-                        unsafe {
-                            let node = n.node.assume_safe();
-                            if node.has_meta("is_field") && node.get_meta("is_field").to_bool() {
-                                exclude.push(node);
-                            }
-                        };
-                    }
+            for entity in get_entities_at_hexagon(world, &selected_hexagon) {
+                let node = match node_query.get(world, entity) {
+                    Ok(node) => node,
                     Err(_) => continue,
                 };
+                let node = node.get_instance();
+                if node.has_meta("is_field") && node.get_meta("is_field").to_bool() {
+                    exclude.push(node);
+                }
             }
 
             let adjustment_vector = Vector2::new(hexfield_size / 8.0, hexfield_size / 8.0);
@@ -277,13 +237,11 @@ pub fn calculate_hexagon_points(hexfield_size: f32) -> Vec<Vector2> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use legion::{World, WorldOptions};
+    use bevy_ecs::prelude::World;
 
     //noinspection DuplicatedCode
     #[test]
     fn create_grid_creates_grid_of_correct_size() {
-        let world = World::new(WorldOptions::default());
-
         let grid: Vec<Hexagon> = create_grid(1);
         assert_eq!(grid.len(), 7);
 
@@ -308,23 +266,21 @@ mod tests {
         assert!(grid.iter().any(|position_data| position_data.get_q() == 1
             && position_data.get_r() == -1
             && position_data.get_s() == 0));
-
-        assert_eq!(Entity::query().iter(&world).count(), 0);
     }
 
     #[test]
     fn get_entities_at_hexagon_returns_all_entities_with_the_correct_tag_value() {
-        let mut world = World::new(WorldOptions::default());
-        world.extend(vec![(Hexagon::new_axial(0, 0),)]);
-        world.extend(vec![(Hexagon::new_axial(1, 3),)]);
-        world.extend(vec![(Hexagon::new_axial(1, 3),)]);
-        world.extend(vec![(Hexagon::new_axial(1, 3),)]);
-        world.extend(vec![(Hexagon::new_axial(1, 3),)]);
+        let mut world = World::default();
+        world.spawn().insert(Hexagon::new_axial(0, 0));
+        world.spawn().insert(Hexagon::new_axial(0, 0));
+        world.spawn().insert(Hexagon::new_axial(1, 3));
+        world.spawn().insert(Hexagon::new_axial(1, 3));
+        world.spawn().insert(Hexagon::new_axial(1, 3));
+        world.spawn().insert(Hexagon::new_axial(1, 3));
 
-        let result = get_entities_at_hexagon(&Hexagon::new_axial(1, 3), &world);
+        let result = get_entities_at_hexagon(&mut world, &Hexagon::new_axial(1, 3));
         assert!(result.iter().all(|entity| {
-            let entry = world.entry(*entity).unwrap();
-            let hexagon = entry.get_component::<Hexagon>().unwrap();
+            let hexagon = world.entity(*entity).get::<Hexagon>().unwrap();
             hexagon.get_q() == 1 && hexagon.get_r() == 3
         }));
         assert_eq!(result.len(), 4);

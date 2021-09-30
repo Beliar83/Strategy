@@ -1,8 +1,9 @@
 use crate::components::hexagon::Hexagon;
 use crate::player::Player;
-use legion::Entity;
+use bevy_ecs::prelude::*;
 use std::collections::vec_deque::VecDeque;
 
+#[derive(Clone)]
 pub struct GameState {
     pub state: State,
     pub players: Vec<Player>,
