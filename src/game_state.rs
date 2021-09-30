@@ -1,19 +1,14 @@
-use crate::components::hexagon::Hexagon;
+use crate::components::cell::Cell;
 use crate::player::Player;
-use legion::Entity;
+use bevy_ecs::prelude::*;
 use std::collections::vec_deque::VecDeque;
 
+#[derive(Clone)]
 pub struct GameState {
     pub state: State,
     pub players: Vec<Player>,
     pub current_player: Option<usize>,
-    pub current_path: Vec<Hexagon>,
-    pub redraw_grid: bool,
-    pub red_layer: bool,
-    pub green_layer: bool,
-    pub blue_layer: bool,
-    pub update_fields: bool,
-    pub hovered_hexagon: Option<Hexagon>,
+    pub current_path: Vec<Cell>,
 }
 
 impl GameState {
@@ -23,12 +18,6 @@ impl GameState {
             players: Vec::new(),
             current_player: None,
             current_path: Vec::new(),
-            redraw_grid: false,
-            red_layer: true,
-            green_layer: true,
-            blue_layer: true,
-            update_fields: false,
-            hovered_hexagon: None,
         }
     }
 }
@@ -38,7 +27,7 @@ pub enum State {
     Startup,
     NewRound,
     Waiting,
-    Selected(Entity),
+    Selected(Cell, Option<Entity>),
     Attacking(Entity, Entity),
-    Moving(Entity, VecDeque<Hexagon>, f64),
+    Moving(Entity, VecDeque<Cell>, f64),
 }

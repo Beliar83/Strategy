@@ -1,39 +1,39 @@
-use crate::components::node_component::NodeComponent;
-use crate::systems::{with_world, UpdateNodes};
-use crossbeam::channel::Receiver;
-use crossbeam::crossbeam_channel;
+// use crate::components::node_component::NodeComponent;
+// use crossbeam::channel::Receiver;
+// use crossbeam::crossbeam_channel;
+use crate::systems::hexmap::{cursor_entered, select_pressed, update_position, update_selected};
+use bevy_app::prelude::*;
+use bevy_ecs::prelude::*;
 use gdnative::api::Camera2D;
 use gdnative::prelude::*;
-use legion::world::Event;
-use legion::{component, Entity};
-use std::collections::HashMap;
+// use std::collections::HashMap;
 
 #[derive(NativeClass)]
 #[inherit(Node2D)]
 #[register_with(Self::register_signals)]
 pub struct GameWorld {
-    process: UpdateNodes,
-    event_receiver: Receiver<Event>,
-    node_entity: HashMap<Entity, Ref<Node2D>>,
     #[property]
     ui_node: Option<NodePath>,
     #[property]
     camera_node: Option<NodePath>,
+    app: App,
 }
 
 #[methods]
 impl GameWorld {
     pub fn new(owner: TRef<'_, Node2D>) -> Self {
-        let (sender, receiver) = crossbeam_channel::unbounded();
-        with_world(|world| {
-            world.subscribe(sender.clone(), component::<NodeComponent>());
-        });
+        let mut builder = App::build();
+
+        builder.add_system(update_position.system());
+        builder.add_system(update_selected.system());
+        builder.add_system(cursor_entered.system());
+        builder.add_system(select_pressed.system());
+
+        let app = builder.app;
         Self {
-            process: UpdateNodes::new(owner.claim(), 40f32),
-            event_receiver: receiver,
-            node_entity: HashMap::new(),
             ui_node: None,
             camera_node: None,
+            app,
         }
     }
 
@@ -58,27 +58,6 @@ impl GameWorld {
 
     #[export]
     pub fn _process(&mut self, owner: TRef<'_, Node2D>, delta: f64) {
-        let mut added_entities = Vec::new();
-        let mut removed_entities = Vec::new();
-        for event in self.event_receiver.try_iter() {
-            match event {
-                Event::EntityInserted(entity, _) => added_entities.push(entity),
-                Event::EntityRemoved(entity, _) => removed_entities.push(entity),
-                _ => {}
-            }
-        }
-        for entity in added_entities {
-            with_world(|world| {
-                let entry = world.entry(entity).unwrap();
-                let node = entry.get_component::<NodeComponent>().unwrap();
-                self.node_entity.insert(entity, node.node);
-            });
-        }
-
-        for entity in removed_entities {
-            unsafe { self.node_entity[&entity].assume_safe() }.queue_free();
-        }
-
         let ui_node = match &self.ui_node {
             None => {
                 godot_error!("ui_node is not set");
@@ -119,26 +98,21 @@ impl GameWorld {
             },
         };
 
-        self.process.execute(&owner, ui_node, camera_node, delta);
+        self.app.update();
+
         owner.update();
     }
 
     #[export]
     pub fn _unhandled_input(&mut self, _owner: &Node2D, event: Variant) {
-        if let Some(event) = event.try_to_object::<InputEvent>() {
-            self.process.queue_input(event);
-        }
+        if let Some(event) = event.try_to_object::<InputEvent>() {}
     }
 
     #[export]
-    pub fn on_new_round(&mut self, _owner: TRef<'_, Node2D>) {
-        self.process.new_round();
-    }
+    pub fn on_new_round(&mut self, _owner: TRef<'_, Node2D>) {}
 
     #[export]
-    pub fn _draw(&mut self, _owner: TRef<'_, Node2D>) {
-        self.process.execute_draw();
-    }
+    pub fn _draw(&mut self, _owner: TRef<'_, Node2D>) {}
 }
 
 #[cfg(test)]

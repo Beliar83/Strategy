@@ -18,19 +18,18 @@
 use gdnative::prelude::*;
 
 use nodes::gameworld;
-use nodes::units::dummy_unit;
 
 mod components;
 mod game_state;
-mod legion;
+mod misc;
 mod nodes;
 mod player;
+mod resources;
 mod systems;
 
 // Function that registers all exposed classes to Godot
 fn init(handle: InitHandle) {
     handle.add_class::<gameworld::GameWorld>();
-    handle.add_class::<dummy_unit::DummyUnit>();
 }
 
 // macros that create the entry-points of the dynamic library.

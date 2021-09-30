@@ -1,6 +1,6 @@
 pub mod field;
-pub mod hexagon;
-pub mod node_component;
-pub mod node_template;
+pub mod cell;
+pub mod instance;
+pub mod node;
 pub mod player;
 pub mod unit;
