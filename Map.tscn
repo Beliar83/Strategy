@@ -66,6 +66,8 @@ __meta__ = {
 z_index = 1
 script = ExtResource( 1 )
 
+[node name="Cells" type="Node2D" parent="GameWorld"]
+
 [node name="Units" type="Node2D" parent="GameWorld"]
 
 [node name="Camera2D" type="Camera2D" parent="."]

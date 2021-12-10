@@ -2,12 +2,6 @@
 
 open Godot
 open Strategy.FSharp.Hexagon
-
-[<Struct>]
-type Field = { Position : Hexagon; Attackable: bool; Moveable: bool; Highlighted: bool}
-
-[<Struct>]
-type HexMap = { CellSize: float32; Cells: Field[] }
         
 let CreateGrid radius =
 
@@ -27,6 +21,7 @@ let CreateGrid radius =
     hexagons
 
 let Get2DPositionOfHexagon (hexagon: Hexagon) hexFieldSize =
+    let hexFieldSize = hexFieldSize * 10f
     let x =
         hexFieldSize
         * (sqrt 3f * float32 hexagon.Q
