@@ -1,7 +1,7 @@
 ﻿module Strategy.FSharp.Hexagon
 
 open System
-open System.Numerics
+open Godot
 
 let CubeRound x y z =
     let mutable rx = round x
@@ -33,52 +33,74 @@ type Direction =
 
 
 type Hexagon =
-        {Q: int32
-         R: int32
-         S: int32}
+    { Q: int32
+      R: int32
+      S: int32 }
 
-        static member Zero = { Q = 0; R = 0; S = 0 }
+    static member Zero = { Q = 0; R = 0; S = 0 }
 
-        static member NewAxial q r =
-            // https://www.redblobgames.com/grids/hexagons/#conversions-axial
-            {Q = q; R = r; S = CalculateAxis q r}
+    static member NewAxial q r =
+        // https://www.redblobgames.com/grids/hexagons/#conversions-axial
+        { Q = q; R = r; S = CalculateAxis q r }
 
-        static member NewCube q r s = {Q = q; R = r; S = s}
+    static member NewCube q r s = { Q = q; R = r; S = s }
 
-        static member FromVector2(pos: Vector2, hexfield_size) =
-            let q =
-                ((sqrt <| 3f) / 3f * pos.X - 1f / 3f * pos.Y)
-                / hexfield_size
+    static member At2DPosition cellSize (pos: Vector2) =
+        let q =
+            ((sqrt <| 3f) / 3f * pos.x - 1f / 3f * pos.y)
+            / cellSize
 
-            let r = (2f / 3f * pos.Y) / hexfield_size
-            let s = -q - r
-            let q, r, s = CubeRound q r s
-            Hexagon.NewCube q r s
+        let r = (2f / 3f * pos.y) / cellSize
+        let s = -q - r
+        let q, r, s = CubeRound q r s
+        Hexagon.NewCube q r s
 
-        member self.MoveQ length =
-            Hexagon.NewCube(self.Q + length) self.R (self.S - length)
+    member this.Get2DPosition cellSize =
+        let x =
+            cellSize
+            * (sqrt 3f * float32 this.Q
+               + sqrt 3f / 2f * float32 this.R)
 
-        member self.MoveR length =
-            Hexagon.NewCube self.Q (self.R + length) (self.S - length)
+        let y = cellSize * (3f / 2f * float32 this.R)
 
-        member self.MoveS length =
-            Hexagon.NewCube(self.Q - length) (self.R + length) self.S
+        Vector2(x, y)
 
-        member self.DistanceTo(other: Hexagon) =
-            // https://www.redblobgames.com/grids/hexagons/#distances-cube
-            ((abs <| (self.Q - other.Q))
-             + (abs <| (self.R - other.R))
-             + (abs <| (self.S - other.S)))
-            / 2
+    // Create from Vector2 representation for easy passing to and from Godot
+    static member FromVector2(vector: Vector2) =
+        let q = int32 vector.x
+        let r = int32 vector.y
+        Hexagon.NewAxial q r
 
-        member self.IsNeighbour other = self.DistanceTo other = 1
+    // Represent as Vector2 for easy passing to and from Godot
+    member this.AsVector2 =
+        let x = float32 this.Q
+        let y = float32 this.R
+        Vector2(x, y)
 
-        member self.GetNeighbour direction =
-            match direction with
-            | Direction.East -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
-            | Direction.NorthEast -> Hexagon.NewCube(self.Q + 1) (self.R - 1) self.S
-            | Direction.NorthWest -> Hexagon.NewCube self.Q (self.R - 1) (self.S + 1)
-            | Direction.West -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
-            | Direction.SouthWest -> Hexagon.NewCube(self.Q - 1) (self.R + 1) self.S
-            | Direction.SouthEast -> Hexagon.NewCube self.Q (self.R + 1) (self.S - 1)
-            | _ -> raise (ArgumentOutOfRangeException("direction"))
+    member self.MoveQ length =
+        Hexagon.NewCube(self.Q + length) self.R (self.S - length)
+
+    member self.MoveR length =
+        Hexagon.NewCube self.Q (self.R + length) (self.S - length)
+
+    member self.MoveS length =
+        Hexagon.NewCube(self.Q - length) (self.R + length) self.S
+
+    member self.DistanceTo(other: Hexagon) =
+        // https://www.redblobgames.com/grids/hexagons/#distances-cube
+        ((abs <| (self.Q - other.Q))
+         + (abs <| (self.R - other.R))
+         + (abs <| (self.S - other.S)))
+        / 2
+
+    member self.IsNeighbour other = self.DistanceTo other = 1
+
+    member self.GetNeighbour direction =
+        match direction with
+        | Direction.East -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
+        | Direction.NorthEast -> Hexagon.NewCube(self.Q + 1) (self.R - 1) self.S
+        | Direction.NorthWest -> Hexagon.NewCube self.Q (self.R - 1) (self.S + 1)
+        | Direction.West -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
+        | Direction.SouthWest -> Hexagon.NewCube(self.Q - 1) (self.R + 1) self.S
+        | Direction.SouthEast -> Hexagon.NewCube self.Q (self.R + 1) (self.S - 1)
+        | _ -> raise (ArgumentOutOfRangeException("direction"))

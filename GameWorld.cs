@@ -1,10 +1,4 @@
-using Godot;
-
-public class GameWorld : Strategy.FSharp.GameWorld
+namespace Strategy
 {
-	/// <inheritdoc />
-	public override void _Input(InputEvent @event)
-	{
-		base._Input(@event);
-	}
+    public class GameWorld : FSharp.GameWorld.GameWorld { }
 }

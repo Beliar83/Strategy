@@ -7,19 +7,20 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Compile Include="Hexagon.fs" />
-      <Compile Include="HexMap.fs" />
-      <Compile Include="GameWorld.fs" />
+        <Compile Include="Hexagon.fs"/>
+        <Compile Include="HexMap.fs"/>
+        <Compile Include="GameWorld.fs"/>
+        <Compile Include="Library.fs"/>
     </ItemGroup>
 
     <ItemGroup>
-      <Reference Include="GodotSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
-        <HintPath>..\.mono\assemblies\Debug\GodotSharp.dll</HintPath>
-      </Reference>
+        <Reference Include="GodotSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+            <HintPath>..\.mono\assemblies\Debug\GodotSharp.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Garnet" Version="0.5.3" />
+        <PackageReference Include="Garnet" Version="0.5.3"/>
     </ItemGroup>
 
 </Project>
