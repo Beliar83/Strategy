@@ -48,26 +48,25 @@ type HexMap() =
             this.UpdateCells()
 
 
+    member this.SelectedCell: Option<Hexagon> = selectedCell
 
-    member this.SelectedCell
-        with get (): Option<Hexagon> = selectedCell
-        and set value =
-            if not (selectedCell = value) then
-                match selectedCell with
-                | Some cell ->
-                    if cellNodes.ContainsKey cell then
-                        (GD.InstanceFromId cellNodes.[cell])
-                            .EmitSignal("Deselected")
-                | None -> ()
+    member this.SelectCell(cell: Hexagon) =
+        if not (selectedCell = Some(cell)) then
+            match selectedCell with
+            | Some selectedCell ->
+                if cellNodes.ContainsKey selectedCell then
+                    (GD.InstanceFromId cellNodes.[selectedCell])
+                        .EmitSignal("Deselected")
+            | None -> ()
 
-                selectedCell <- value
+            if cellNodes.ContainsKey(cell) then
+                selectedCell <- Some(cell)
 
-                match selectedCell with
-                | Some cell ->
-                    if cellNodes.ContainsKey cell then
-                        (GD.InstanceFromId cellNodes.[cell])
-                            .EmitSignal("Selected")
-                | None -> ()
+                (GD.InstanceFromId cellNodes.[cell])
+                    .EmitSignal("Selected")
+            else
+                selectedCell <- None
+
 
     member this.UpdateCells() =
         while this.GetChildCount() > 0 do
@@ -77,8 +76,12 @@ type HexMap() =
                 node.QueueFree()
                 this.RemoveChild node
 
+        selectedCell <- None
+
         let hexagon =
             GD.Load("res://Hexagon.tscn") :?> PackedScene
+
+        cellNodes.Clear()
 
         for cell in this.Cells do
             let node = hexagon.Instance() :?> Node2D

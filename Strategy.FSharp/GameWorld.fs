@@ -22,6 +22,7 @@ type Draw =
 
     end
 
+
 let CreateGrid radius =
 
     let CreateCube (q, r) = Hexagon.NewAxial q r
@@ -51,6 +52,8 @@ type GameWorld() =
 
         world.AddResource("MapRadius", 1)
         world.AddResource("UpdateMap", true)
+        world.AddResource("CursorPosition", Vector2.Zero)
+        world.AddResource("UpdateSelected", true)
 
         update <-
             world.On<Update>
@@ -73,7 +76,24 @@ type GameWorld() =
                     cellsNode.Cells <- Array<Vector2>(cells)
 
                     world.AddResource("UpdateMap", false)
-                    this.Update()
+                    world.AddResource("UpdateSelected", true)
+
+                let updateSelected =
+                    world.LoadResource<bool> "UpdateSelected"
+
+                if updateSelected then
+                    let mousePosition =
+                        world.LoadResource<Vector2> "CursorPosition"
+
+                    let cellsNode =
+                        new NodePath("Cells") |> this.GetNode :?> HexMap
+
+                    let cell =
+                        cellsNode.GetCellAtPosition mousePosition
+
+                    cellsNode.SelectCell cell
+                    world.AddResource("UpdateSelected", false)
+
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
 
@@ -101,12 +121,6 @@ type GameWorld() =
                     world.AddResource("UpdateMap", true)
                 | _ -> ()
         | :? InputEventMouseMotion as event ->
-
-            let cellsNode =
-                new NodePath("Cells") |> this.GetNode :?> HexMap
-
-            let cell =
-                cellsNode.GetCellAtPosition event.Position
-
-            cellsNode.SelectedCell <- Some(cell)
+            world.AddResource("CursorPosition", event.Position)
+            world.AddResource("UpdateSelected", true)
         | _ -> ()
