@@ -4,6 +4,8 @@ open Godot
 open Godot.Collections
 open Strategy.FSharp.Hexagon
 open System.Collections.Generic
+open Garnet.Composition
+open Strategy.FSharp.Systems
 
 
 let PolygonWidth cellSize = sqrt 3f * cellSize
@@ -36,9 +38,9 @@ type HexMap() =
     let mutable selectedCell = None
 
     member this.CellSize
-        with get () = cellSize / 10f
+        with get () = cellSize
         and set value =
-            cellSize <- value * 10f
+            cellSize <- value
             this.UpdateCells()
 
     member this.Cells
@@ -70,7 +72,7 @@ type HexMap() =
 
     member this.UpdateCells() =
         while this.GetChildCount() > 0 do
-            let node = this.GetChildOrNull<Node> 0
+            let node = this.GetChildOrNull<Godot.Node> 0
 
             if not <| isNull node then
                 node.QueueFree()
@@ -102,3 +104,15 @@ let GetNeighbours (hexagon: Hexagon) =
        hexagon.GetNeighbour(Direction.West),
        hexagon.GetNeighbour(Direction.SouthWest),
        hexagon.GetNeighbour(Direction.SouthEast) |]
+
+let registerSystem (c: Container) =
+      c.On<Update>
+      <| fun _ ->
+            let cellsNode = c.LoadResource<uint64>("CellsNode")
+            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+            for entity in c.Query<Eid, Hexagon>() do
+                let entityId = entity.Value1
+                let hexagon = entity.Value2
+                let entity = c.Get entityId
+                let position = hexagon.Get2DPosition cellsNode.CellSize
+                entity.Add {X = position.x; Y = position.y}

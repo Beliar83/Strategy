@@ -6,15 +6,8 @@ open Godot.Collections
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
 open Strategy.FSharp.HexMap
-
-[<Struct>]
-type Position = { X: float32; Y: float32 }
-
-[<Struct>]
-type Node = { id: uint64 }
-
-[<Struct>]
-type Update = { UpdateTime: float32 }
+open Strategy.FSharp.DynamicNodes
+open Strategy.FSharp.Systems
 
 [<Struct>]
 type Draw =
@@ -54,7 +47,14 @@ type GameWorld() =
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("UpdateSelected", true)
-
+        let unitsNode = this.GetNode (new NodePath("Units"))
+        world.AddResource("UnitsNode", unitsNode.GetInstanceId())
+        let cellsNode = new NodePath("Cells") |> this.GetNode :?> HexMap
+        world.AddResource("CellsNode", cellsNode.GetInstanceId())       
+        
+        registerSystem(world) |> ignore
+        HexMap.registerSystem(world) |> ignore
+        
         update <-
             world.On<Update>
             <| fun time ->
@@ -85,14 +85,21 @@ type GameWorld() =
                     let mousePosition =
                         world.LoadResource<Vector2> "CursorPosition"
 
-                    let cellsNode =
-                        new NodePath("Cells") |> this.GetNode :?> HexMap
+                    let cellsNode = world.LoadResource<uint64>("CellsNode")
+                    let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
 
                     let cell =
                         cellsNode.GetCellAtPosition mousePosition
 
                     cellsNode.SelectCell cell
                     world.AddResource("UpdateSelected", false)
+                
+                for entity in world.Query<Node, Position>() do
+                    let node = entity.Value1
+                    let position = entity.Value2
+                    
+                    let node = GD.InstanceFromId node.NodeId :?> Node2D
+                    node.Position <- Vector2(position.X, position.Y)
 
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }

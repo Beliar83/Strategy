@@ -7,10 +7,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Hexagon.fs"/>
-        <Compile Include="HexMap.fs"/>
-        <Compile Include="GameWorld.fs"/>
-        <Compile Include="Library.fs"/>
+        <Compile Include="Hexagon.fs" />
+        <Compile Include="Systems.fs" />
+        <Compile Include="HexMap.fs" />
+        <Compile Include="DynamicNodes.fs" />        
+        <Compile Include="GameWorld.fs" />
+        <Compile Include="Library.fs" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Garnet" Version="0.5.3"/>
+        <PackageReference Include="Garnet" Version="0.5.3" />
     </ItemGroup>
 
 </Project>
