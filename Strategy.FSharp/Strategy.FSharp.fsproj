@@ -9,6 +9,8 @@
     <ItemGroup>
         <Compile Include="Hexagon.fs" />
         <Compile Include="Systems.fs" />
+        <Compile Include="Input.fs" />
+        <Compile Include="Nodes.fs" />
         <Compile Include="HexMap.fs" />
         <Compile Include="DynamicNodes.fs" />        
         <Compile Include="GameWorld.fs" />

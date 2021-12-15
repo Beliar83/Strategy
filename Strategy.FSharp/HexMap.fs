@@ -5,8 +5,8 @@ open Godot.Collections
 open Strategy.FSharp.Hexagon
 open System.Collections.Generic
 open Garnet.Composition
+open Strategy.FSharp.Input
 open Strategy.FSharp.Systems
-
 
 let PolygonWidth cellSize = sqrt 3f * cellSize
 
@@ -36,7 +36,17 @@ type HexMap() =
     let mutable cells = Array<Vector2>()
     let cellNodes = Dictionary<Hexagon, uint64>()
     let mutable selectedCell = None
+    let mutable cursorCell = None
 
+    let emitCellSignal signal cell =        
+        (GD.InstanceFromId cellNodes.[cell])
+            .EmitSignal signal
+
+    let emitCellSelected = emitCellSignal "selected"
+    let emitCellDeselected = emitCellSignal "deselected"
+    let emitCursorEnteredCell = emitCellSignal "cursor_entered"
+    let emitCursorExitedCell = emitCellSignal "cursor_exited"
+    
     member this.CellSize
         with get () = cellSize
         and set value =
@@ -51,21 +61,25 @@ type HexMap() =
 
 
     member this.SelectedCell: Option<Hexagon> = selectedCell
+    member this.CursorCell : Option<Hexagon> = cursorCell
 
     member this.SelectCell(cell: Hexagon) =
-        if not (selectedCell = Some(cell)) then
+        let sameCell =
+            match selectedCell with
+            | Some selectedCell -> cell = selectedCell
+            | None -> false    
+        
+        if not sameCell then
             match selectedCell with
             | Some selectedCell ->
-                if cellNodes.ContainsKey selectedCell then
-                    (GD.InstanceFromId cellNodes.[selectedCell])
-                        .EmitSignal("Deselected")
+                if cellNodes.ContainsKey(selectedCell) then
+                    emitCellDeselected selectedCell
             | None -> ()
-
+            
+            
             if cellNodes.ContainsKey(cell) then
                 selectedCell <- Some(cell)
-
-                (GD.InstanceFromId cellNodes.[cell])
-                    .EmitSignal("Selected")
+                emitCellSelected cell
             else
                 selectedCell <- None
 
@@ -79,6 +93,7 @@ type HexMap() =
                 this.RemoveChild node
 
         selectedCell <- None
+        cursorCell <- None
 
         let hexagon =
             GD.Load("res://Hexagon.tscn") :?> PackedScene
@@ -96,6 +111,25 @@ type HexMap() =
             this.Update()
 
     member this.GetCellAtPosition(position: Vector2) = Hexagon.At2DPosition cellSize position
+    
+    member this.UpdateCursorCell(cell: Hexagon) =
+        let sameCell =
+            match cursorCell with
+            | Some currentCell -> cell = currentCell
+            | None -> false      
+        
+        if not sameCell then        
+            match cursorCell with
+                | Some currentCell -> 
+                    if cellNodes.ContainsKey(currentCell) then
+                        emitCursorExitedCell currentCell
+                | None -> ()
+                
+            if cellNodes.ContainsKey(cell) then
+                cursorCell <- Some(cell)
+                emitCursorEnteredCell cell
+            else
+                cursorCell <- None          
 
 let GetNeighbours (hexagon: Hexagon) =
     [| hexagon.GetNeighbour(Direction.East),
@@ -105,9 +139,10 @@ let GetNeighbours (hexagon: Hexagon) =
        hexagon.GetNeighbour(Direction.SouthWest),
        hexagon.GetNeighbour(Direction.SouthEast) |]
 
-let registerSystem (c: Container) =
-      c.On<Update>
-      <| fun _ ->
+module HexMapSystem =
+    let registerUpdatePosition (c: Container) =
+        c.On<Update>
+        <| fun _ ->
             let cellsNode = c.LoadResource<uint64>("CellsNode")
             let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
             for entity in c.Query<Eid, Hexagon>() do
@@ -116,3 +151,51 @@ let registerSystem (c: Container) =
                 let entity = c.Get entityId
                 let position = hexagon.Get2DPosition cellsNode.CellSize
                 entity.Add {X = position.x; Y = position.y}
+                
+    let registerUpdateSelected(c: Container) =
+        c.On<Update>
+        <| fun _ ->
+
+            let cellsNode = c.LoadResource<uint64>("CellsNode")
+            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+
+            let mousePosition =
+                c.LoadResource<Vector2> "CursorPosition"
+
+            let cell =
+                cellsNode.GetCellAtPosition mousePosition
+            
+            c.Send <| { Cell = cell }
+                
+    let registerCursorEntered (c: Container) =
+        c.On<CursorMoved>
+        <| fun event ->
+            let cellsNode = c.LoadResource<uint64>("CellsNode")
+            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+            
+            cellsNode.UpdateCursorCell event.Cell
+            
+    let registerSelectPressed (c: Container) =
+        c.On<ButtonPressed>
+        <| fun event ->
+            match event.Button with
+            | Select ->
+                let cellsNode = c.LoadResource<uint64>("CellsNode")
+                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+                match cellsNode.CursorCell with
+                | Some cell -> cellsNode.SelectCell cell
+                | None -> ()
+
+
+    let register (c: Container) =
+        Disposable.Create [
+            registerUpdatePosition c
+            registerUpdateSelected c
+            registerCursorEntered c
+            registerSelectPressed c
+        ]
+    
+    
+                
+    
+                
