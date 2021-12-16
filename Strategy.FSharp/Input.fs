@@ -1,11 +1,13 @@
 ﻿module Strategy.FSharp.Input
+
 open Strategy.FSharp.Hexagon
 
 type Button =
     | Select
+    | Cancel
 
 [<Struct>]
-type CursorMoved = { Cell: Hexagon }
+type CursorMoved = { CursorCell: Hexagon }
 
 [<Struct>]
-type ButtonPressed = { Button : Button }
+type ButtonPressed = { Button: Button }

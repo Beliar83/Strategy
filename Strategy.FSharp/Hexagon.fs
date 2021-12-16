@@ -3,6 +3,9 @@
 open System
 open Godot
 
+
+let CELL_SIZE = 40.0f
+
 let CubeRound x y z =
     let mutable rx = round x
     let mutable ry = round y
@@ -31,7 +34,6 @@ type Direction =
     | SouthWest = 4
     | SouthEast = 5
 
-
 type Hexagon =
     { Q: int32
       R: int32
@@ -45,23 +47,23 @@ type Hexagon =
 
     static member NewCube q r s = { Q = q; R = r; S = s }
 
-    static member At2DPosition cellSize (pos: Vector2) =
+    static member At2DPosition(pos: Vector2) =
         let q =
             ((sqrt <| 3f) / 3f * pos.x - 1f / 3f * pos.y)
-            / cellSize
+            / CELL_SIZE
 
-        let r = (2f / 3f * pos.y) / cellSize
+        let r = (2f / 3f * pos.y) / CELL_SIZE
         let s = -q - r
         let q, r, s = CubeRound q r s
         Hexagon.NewCube q r s
 
-    member this.Get2DPosition cellSize =
+    member this.Get2DPosition =
         let x =
-            cellSize
+            CELL_SIZE
             * (sqrt 3f * float32 this.Q
                + sqrt 3f / 2f * float32 this.R)
 
-        let y = cellSize * (3f / 2f * float32 this.R)
+        let y = CELL_SIZE * (3f / 2f * float32 this.R)
 
         Vector2(x, y)
 

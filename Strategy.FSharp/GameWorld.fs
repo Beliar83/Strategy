@@ -6,7 +6,7 @@ open Godot.Collections
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
 open Strategy.FSharp.HexMap
-open Strategy.FSharp.DynamicNodes
+open Strategy.FSharp.Unit
 open Strategy.FSharp.Input
 open Strategy.FSharp.Nodes
 open Strategy.FSharp.Systems
@@ -17,6 +17,7 @@ type Draw =
     struct
 
     end
+
 
 
 let CreateGrid radius =
@@ -49,15 +50,23 @@ type GameWorld() =
         world.AddResource("MapRadius", 1)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
-        let unitsNode = this.GetNode (new NodePath("Units"))
+        let unitsNode = this.GetNode(new NodePath("Units"))
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
-        let cellsNode = new NodePath("Cells") |> this.GetNode :?> HexMap
-        world.AddResource("CellsNode", cellsNode.GetInstanceId())       
-        
-        DynamicNodeSystem.register world |> ignore
+
+        let cellsNode =
+            new NodePath("Cells") |> this.GetNode :?> HexMap
+
+        world.AddResource("CellsNode", cellsNode.GetInstanceId())
+
+        let unitsNode =
+            new NodePath("Units") |> this.GetNode :?> Node2D
+
+        world.AddResource("UnitsNode", unitsNode.GetInstanceId())
+
+        UnitSystem.register world |> ignore
         NodesSystem.register |> ignore
         HexMapSystem.register world |> ignore
-        
+
         update <-
             world.On<Update>
             <| fun _ ->
@@ -77,8 +86,26 @@ type GameWorld() =
                         |> Array.map (fun c -> c.AsVector2)
 
                     cellsNode.Cells <- Array<Vector2>(cells)
+                    world.Send { SelectedCell = None }
 
                     world.AddResource("UpdateMap", false)
+
+        world
+            .Create()
+            .With(
+                { Integrity = 10
+                  Damage = 2
+                  MaxAttackRange = 3
+                  MinAttackRange = 1
+                  Armor = 1
+                  Mobility = 3
+                  RemainingRange = 0
+                  RemainingAttacks = 0 }
+            )
+            .With(Hexagon.NewAxial 0 0)
+        |> ignore
+
+
 
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
@@ -106,10 +133,14 @@ type GameWorld() =
                     world.AddResource("MapRadius", max 1 (radius - 1))
                     world.AddResource("UpdateMap", true)
                 | _ -> ()
-        | :? InputEventMouseMotion as event ->
-            world.AddResource("CursorPosition", event.Position)
+        | :? InputEventMouseMotion as event -> world.AddResource("CursorPosition", event.Position)
         | :? InputEventMouseButton as event ->
-            let button = enum<ButtonList> (int32 event.ButtonIndex)
-            if button = ButtonList.Left then
-                world.Send <| { Button = Button.Select }
+            let button =
+                enum<ButtonList> (int32 event.ButtonIndex)
+
+            match button with
+            | ButtonList.Left -> world.Send <| { Button = Button.Select }
+            | ButtonList.Right -> world.Send <| { Button = Button.Cancel }
+            | _ -> ()
+
         | _ -> ()
