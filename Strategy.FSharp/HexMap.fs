@@ -37,7 +37,6 @@ type HexMap() =
     inherit Node2D()
     let mutable cells = Array<Vector2>()
     let cellNodes = Dictionary<Hexagon, uint64>()
-    let mutable selectedCell = None
     let mutable cursorCell = None
 
     let emitCellSignal signal cell =
@@ -55,43 +54,45 @@ type HexMap() =
             cells <- value
             this.UpdateCells()
 
-
-    member this.SelectedCell: Option<Hexagon> = selectedCell
     member this.CursorCell: Option<Hexagon> = cursorCell
 
-    member this.SelectCell(cell: Hexagon) =
-        let sameCell =
-            match selectedCell with
-            | Some selectedCell -> cell = selectedCell
-            | None -> false
-
-        if not sameCell then
-            this.DeselectCell()
-
+    member this.SelectCell (state: GameState) (cell: Hexagon) =
+        let selectNew () =
             if cellNodes.ContainsKey(cell) then
-                selectedCell <- Some(cell)
                 emitCellSelected cell
+                GameState.Selected(cell, None)
             else
-                selectedCell <- None
+                GameState.Waiting
 
-    member this.DeselectCell() =
-        match selectedCell with
-        | Some selectedCell ->
+        match state with
+        | Selected (selectedCell, _) ->
+            if not <| (cell = selectedCell) then
+                this.DeselectCell(state) |> ignore
+                selectNew ()
+            else
+                state
+        | Waiting -> selectNew ()
+        | _ -> state
+
+
+
+    member this.DeselectCell(state: GameState) =
+        match state with
+        | Selected (selectedCell, _) ->
             if cellNodes.ContainsKey(selectedCell) then
                 emitCellDeselected selectedCell
-        | None -> ()
 
-        selectedCell <- None
+            GameState.Waiting
+        | _ -> state
 
     member this.UpdateCells() =
         while this.GetChildCount() > 0 do
-            let node = this.GetChildOrNull<Godot.Node> 0
+            let node = this.GetChildOrNull<Node> 0
 
             if not <| isNull node then
                 node.QueueFree()
                 this.RemoveChild node
 
-        selectedCell <- None
         cursorCell <- None
 
         let hexagon =
@@ -173,31 +174,41 @@ module HexMapSystem =
     let registerSelectPressed (c: Container) =
         c.On<ButtonPressed>
         <| fun event ->
-            match event.Button with
-            | Select ->
-                let cellsNode = c.LoadResource<uint64>("CellsNode")
-                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+            let state = c.LoadResource<GameState>("State")
 
-                match cellsNode.CursorCell with
-                | Some cell -> c.Send { SelectedCell = Some(cell) }
-                | None -> ()
-            | Cancel -> c.Send { SelectedCell = None }
-
-    let registerCellSelected (c: Container) =
-        c.On<CellSelected>
-        <| fun selected ->
             let cellsNode = c.LoadResource<uint64>("CellsNode")
             let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
 
-            match selected.SelectedCell with
-            | Some (cell) -> cellsNode.SelectCell cell
-            | None -> cellsNode.DeselectCell()
+            let selectCursorCell () =
+                match cellsNode.CursorCell with
+                | Some cell -> cellsNode.SelectCell state cell
+                | None -> state
 
+            let deselectCell () = cellsNode.DeselectCell state
+
+            let newState =
+                match state with
+                | Waiting ->
+                    match event.Button with
+                    | Select -> selectCursorCell ()
+                    | _ -> state
+                | Selected _ ->
+                    match event.Button with
+                    | Select -> selectCursorCell ()
+                    | Cancel -> deselectCell ()
+                // TODO: Attacking, Moving
+                | _ -> state
+
+            match newState with
+            | Waiting -> c.Send { SelectedCell = None }
+            | Selected (cell, _) -> c.Send { SelectedCell = Some(cell) }
+            | _ -> ()
+
+            c.AddResource("State", newState)
 
 
     let register (c: Container) =
         Disposable.Create [ registerUpdatePosition c
                             registerUpdateSelected c
                             registerCursorEntered c
-                            registerSelectPressed c
-                            registerCellSelected c ]
+                            registerSelectPressed c ]

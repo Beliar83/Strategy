@@ -86,19 +86,23 @@ module UnitSystem =
     let registerInput (c: Container) =
         c.On<CellSelected>
         <| fun selected ->
-            for entity in c.Query<Unit, Node, Hexagon>() do
-                let node = entity.Value2
+            for entity in c.Query<Eid, Unit, Node, Hexagon>() do
+                let id = entity.Value1
+                let node = entity.Value3
 
                 let node =
                     GD.InstanceFromId(node.NodeId) :?> UnitNode
 
-                let cell = entity.Value3
+                let cell = entity.Value4
 
                 match selected.SelectedCell with
-                | Some (selected) -> node.Selected <- (selected = cell)
+                | Some selected ->
+                    if (selected = cell) then
+                        node.Selected <- true
+                        c.AddResource("State", GameState.Selected(cell, Some(id)))
+                    else
+                        node.Selected <- false
                 | None -> node.Selected <- false
-
-
 
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c

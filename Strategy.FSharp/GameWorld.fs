@@ -20,6 +20,9 @@ type Draw =
 
 
 
+
+
+
 let CreateGrid radius =
 
     let CreateCube (q, r) = Hexagon.NewAxial q r
@@ -43,10 +46,7 @@ type GameWorld() =
     let mutable update = Unchecked.defaultof<_>
     let cells = Dictionary<Hexagon, uint64>()
 
-
-
     override this._Ready() =
-
         world.AddResource("MapRadius", 1)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
@@ -105,8 +105,7 @@ type GameWorld() =
             .With(Hexagon.NewAxial 0 0)
         |> ignore
 
-
-
+        world.AddResource("State", GameState.Waiting)
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
 
@@ -138,9 +137,10 @@ type GameWorld() =
             let button =
                 enum<ButtonList> (int32 event.ButtonIndex)
 
-            match button with
-            | ButtonList.Left -> world.Send <| { Button = Button.Select }
-            | ButtonList.Right -> world.Send <| { Button = Button.Cancel }
-            | _ -> ()
+            if not <| event.IsPressed() then
+                match button with
+                | ButtonList.Left -> world.Send <| { Button = Button.Select }
+                | ButtonList.Right -> world.Send <| { Button = Button.Cancel }
+                | _ -> ()
 
         | _ -> ()
