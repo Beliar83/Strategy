@@ -1,25 +1,25 @@
 ﻿module Strategy.FSharp.GameWorld
 
 
+open System
+open System.Collections.Generic
 open Godot
 open Godot.Collections
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
 open Strategy.FSharp.HexMap
+open Strategy.FSharp.MapUI
 open Strategy.FSharp.Unit
 open Strategy.FSharp.Input
 open Strategy.FSharp.Nodes
 open Strategy.FSharp.Systems
-
+open Strategy.FSharp.Player
 
 [<Struct>]
 type Draw =
     struct
 
     end
-
-
-
 
 
 
@@ -44,12 +44,19 @@ type GameWorld() =
     inherit Node2D()
     let world = Container()
     let mutable update = Unchecked.defaultof<_>
-    let cells = Dictionary<Hexagon, uint64>()
+    let playerQueue = Queue<string>()
+
+    let mutable mapUI: NodePath = null
+
+    member this.MapUI
+        with get () = mapUI
+        and set value = mapUI <- value
 
     override this._Ready() =
         world.AddResource("MapRadius", 1)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
+        world.AddResource("CurrentPlayer", "Player1")
         let unitsNode = this.GetNode(new NodePath("Units"))
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
@@ -62,6 +69,13 @@ type GameWorld() =
             new NodePath("Units") |> this.GetNode :?> Node2D
 
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
+
+        let players =
+            Map [ "Player1", { Color = Color.ColorN "Red" }
+                  "Player2", { Color = Color.ColorN "Blue" } ]
+
+        world.AddResource("Players", players)
+
 
         UnitSystem.register world |> ignore
         NodesSystem.register |> ignore
@@ -79,8 +93,6 @@ type GameWorld() =
                         new NodePath("Cells") |> this.GetNode :?> HexMap
 
 
-                    cells.Clear()
-
                     let cells =
                         CreateGrid mapRadius
                         |> Array.map (fun c -> c.AsVector2)
@@ -89,6 +101,69 @@ type GameWorld() =
                     world.Send { SelectedCell = None }
 
                     world.AddResource("UpdateMap", false)
+
+                let state = world.LoadResource<GameState> "State"
+
+                let mapUI = this.GetNode(mapUI) :?> MapUI
+
+                match state with
+                | Waiting
+                | Selected _ ->
+                    let players =
+                        world.LoadResource<Map<String, PlayerData>> "Players"
+
+                    let playerId =
+                        world.LoadResource<string> "CurrentPlayer"
+
+                    let player = players.[playerId]
+                    mapUI.SetPlayer(playerId, player)
+                | NewRound ->
+                    let players =
+                        world.LoadResource<Map<String, PlayerData>> "Players"
+
+                    if playerQueue.Count <= 0 then
+                        for player in players do
+                            playerQueue.Enqueue(player.Key)
+
+                    let next_player = playerQueue.Dequeue
+                    world.AddResource("CurrentPlayer", next_player)
+                    world.AddResource("State", Waiting)
+                | _ -> ()
+
+
+
+
+        world
+            .Create()
+            .With(
+                { Integrity = 10
+                  Damage = 2
+                  MaxAttackRange = 3
+                  MinAttackRange = 1
+                  Armor = 1
+                  Mobility = 3
+                  RemainingRange = 0
+                  RemainingAttacks = 0 }
+            )
+            .With(Hexagon.NewAxial -1 -1)
+            .With({ PlayerId = "Player1" })
+        |> ignore
+
+        world
+            .Create()
+            .With(
+                { Integrity = 10
+                  Damage = 2
+                  MaxAttackRange = 3
+                  MinAttackRange = 1
+                  Armor = 1
+                  Mobility = 3
+                  RemainingRange = 0
+                  RemainingAttacks = 0 }
+            )
+            .With(Hexagon.NewAxial 1 1)
+            .With({ PlayerId = "Player2" })
+        |> ignore
 
         world
             .Create()
@@ -105,7 +180,7 @@ type GameWorld() =
             .With(Hexagon.NewAxial 0 0)
         |> ignore
 
-        world.AddResource("State", GameState.Waiting)
+        world.AddResource("State", GameState.NewRound)
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
 

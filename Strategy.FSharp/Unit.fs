@@ -1,9 +1,11 @@
 ﻿module Strategy.FSharp.Unit
 
+open System
 open Godot
 open Garnet.Composition
 open Strategy.FSharp.HexMap
 open Strategy.FSharp.Hexagon
+open Strategy.FSharp.Player
 open Strategy.FSharp.Systems
 open Strategy.FSharp.Nodes
 
@@ -46,6 +48,12 @@ type UnitNode() =
 
             outline.Visible <- value
             selected <- value
+
+    member this.Color
+        with get () =
+            (this.GetNode(new NodePath("Model")) :?> CanvasItem)
+                .Modulate
+        and set value = (this.GetNode(new NodePath("Model")) :?> CanvasItem).Modulate <- value
 
 module UnitSystem =
 
@@ -103,6 +111,20 @@ module UnitSystem =
                     else
                         node.Selected <- false
                 | None -> node.Selected <- false
+
+
+                let entity = c.Get id
+
+                if entity.Has<Player>() then
+                    let player = entity.Get<Player>()
+
+                    let players =
+                        c.LoadResource<Map<String, PlayerData>> "Players"
+
+                    if players.ContainsKey(player.PlayerId) then
+                        node.Color <- players.[player.PlayerId].Color
+                else
+                    node.Color <- Color.ColorN("Gray")
 
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c

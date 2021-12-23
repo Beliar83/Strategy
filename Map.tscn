@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://GameWorld.cs" type="Script" id=1]
 [ext_resource path="res://HexMap.cs" type="Script" id=2]
+[ext_resource path="res://MapUI.cs" type="Script" id=3]
 
 [node name="Root" type="Node2D"]
 
@@ -11,6 +12,7 @@
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
+script = ExtResource( 3 )
 __meta__ = {
 "_edit_use_anchors_": false
 }
@@ -34,7 +36,7 @@ __meta__ = {
 }
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UILayer/UI/Bottom"]
-margin_top = 540.0
+margin_top = 560.0
 margin_right = 1024.0
 margin_bottom = 600.0
 mouse_filter = 2
@@ -44,28 +46,19 @@ __meta__ = {
 }
 
 [node name="MarginContainer" type="MarginContainer" parent="UILayer/UI/Bottom/HBoxContainer"]
-margin_left = 908.0
+margin_left = 984.0
 margin_right = 1024.0
-margin_bottom = 60.0
+margin_bottom = 40.0
 mouse_filter = 2
 custom_constants/margin_right = 20
 custom_constants/margin_top = 20
 custom_constants/margin_left = 20
 custom_constants/margin_bottom = 20
 
-[node name="Button" type="Button" parent="UILayer/UI/Bottom/HBoxContainer/MarginContainer"]
-margin_left = 20.0
-margin_top = 20.0
-margin_right = 96.0
-margin_bottom = 40.0
-text = "End round"
-__meta__ = {
-"_edit_use_anchors_": false
-}
-
 [node name="GameWorld" type="Node2D" parent="."]
 z_index = 1
 script = ExtResource( 1 )
+MapUI = NodePath("../UILayer/UI")
 
 [node name="Cells" type="Node2D" parent="GameWorld"]
 script = ExtResource( 2 )
@@ -74,5 +67,3 @@ script = ExtResource( 2 )
 
 [node name="Camera2D" type="Camera2D" parent="."]
 current = true
-
-[connection signal="pressed" from="UILayer/UI/Bottom/HBoxContainer/MarginContainer/Button" to="GameWorld" method="on_new_round"]

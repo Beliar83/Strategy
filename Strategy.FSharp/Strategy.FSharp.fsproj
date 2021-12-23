@@ -7,6 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Player.fs"/>
+        <Compile Include="MapUI.fs"/>
         <Compile Include="Hexagon.fs"/>
         <Compile Include="Systems.fs"/>
         <Compile Include="Input.fs"/>
