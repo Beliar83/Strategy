@@ -3,9 +3,9 @@
 open Godot
 open Godot.Collections
 open Strategy.FSharp.Hexagon
-open System.Collections.Generic
 open Garnet.Composition
 open Strategy.FSharp.Input
+open Strategy.FSharp.MapUI
 open Strategy.FSharp.Systems
 
 let PolygonWidth cellSize = sqrt 3f * cellSize
@@ -30,13 +30,20 @@ let HexagonPoints cellSize =
        Vector2(-halfWidth, quarterHeight)
        Vector2(-halfWidth, -quarterHeight) |]
 
-[<Struct>]
-type CellSelected = { SelectedCell: Option<Hexagon> }
+type UpdateSelection =
+    struct
+
+    end
+
+
 
 type HexMap() =
     inherit Node2D()
     let mutable cells = Array<Vector2>()
-    let cellNodes = Dictionary<Hexagon, uint64>()
+
+    let cellNodes =
+        System.Collections.Generic.Dictionary<Hexagon, uint64>()
+
     let mutable cursorCell = None
 
     let emitCellSignal signal cell =
@@ -56,34 +63,14 @@ type HexMap() =
 
     member this.CursorCell: Option<Hexagon> = cursorCell
 
-    member this.SelectCell (state: GameState) (cell: Hexagon) =
-        let selectNew () =
-            if cellNodes.ContainsKey(cell) then
-                emitCellSelected cell
-                GameState.Selected(cell, None)
-            else
-                GameState.Waiting
+    member this.SelectCell(cell: Hexagon) =
+        if cellNodes.ContainsKey(cell) then
+            emitCellSelected cell
 
-        match state with
-        | Selected (selectedCell, _) ->
-            if not <| (cell = selectedCell) then
-                this.DeselectCell(state) |> ignore
-                selectNew ()
-            else
-                state
-        | Waiting -> selectNew ()
-        | _ -> state
+    member this.DeselectCell(cell) =
+        if cellNodes.ContainsKey(cell) then
+            emitCellDeselected cell
 
-
-
-    member this.DeselectCell(state: GameState) =
-        match state with
-        | Selected (selectedCell, _) ->
-            if cellNodes.ContainsKey(selectedCell) then
-                emitCellDeselected selectedCell
-
-            GameState.Waiting
-        | _ -> state
 
     member this.UpdateCells() =
         while this.GetChildCount() > 0 do
@@ -172,40 +159,125 @@ module HexMapSystem =
             cellsNode.UpdateCursorCell event.CursorCell
 
     let registerSelectPressed (c: Container) =
-        c.On<ButtonPressed>
-        <| fun event ->
+
+        let handleSelect () =
             let state = c.LoadResource<GameState>("State")
 
-            let cellsNode = c.LoadResource<uint64>("CellsNode")
-            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+            let showContextMenuForCell (cell: Hexagon) =
+                // Add actual items
+                let uiNode = c.LoadResource<uint64>("UINode")
+                let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
 
-            let selectCursorCell () =
+                let texture =
+                    ResourceLoader.Load<Texture>("res://icon.png")
+
+                let item1 = new Dictionary()
+                item1.Add("texture", texture)
+                item1.Add("title", "Test")
+                item1.Add("id", "test")
+
+                let item2 = new Dictionary()
+                item2.Add("texture", texture)
+                item2.Add("title", "Test 2")
+                item2.Add("id", "test2")
+
+                let items = [| item1; item2 |]
+
+                let position = cell.Get2DPosition
+
+                let camera = c.LoadResource<uint64> "Camera"
+                let camera = GD.InstanceFromId camera :?> Camera2D
+                let rect = camera.GetViewportRect()
+                let half_size = rect.Size / 2f
+                let position = position + half_size
+
+                c.AddResource("State", GameState.ContextMenu)
+
+
+                async {
+                    let! result = uiNode.ShowRadialMenu items position
+
+                    match result with
+                    | Some id ->
+                        GD.Print id.[0]
+                        c.AddResource("State", GameState.Waiting)
+                    | None ->
+                        GD.Print "Cancelled"
+                        c.AddResource("State", GameState.Waiting)
+                        c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+
+                }
+                |> Async.StartImmediate
+
+            let getEntitiesAtCell (cell: Hexagon) =
+                c.Query<Eid, Hexagon>()
+                |> Seq.filter (fun x -> x.Value2 = cell)
+                |> Seq.map (fun x -> x.Value1)
+                |> Seq.toArray
+
+            let selectCell (hexMap: HexMap) (cell: Hexagon) =
+                hexMap.SelectCell cell
+                c.Send(UpdateSelection())
+
+            match state with
+            | GameState.Startup -> ()
+            | GameState.NewRound -> ()
+            | GameState.Selected (cell, _) ->
+                let cellsNode = c.LoadResource<uint64>("CellsNode")
+                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+
                 match cellsNode.CursorCell with
-                | Some cell -> cellsNode.SelectCell state cell
-                | None -> state
+                | Some cursorCell ->
+                    let entitiesAtCell = getEntitiesAtCell cursorCell
 
-            let deselectCell () = cellsNode.DeselectCell state
+                    match entitiesAtCell.Length with
+                    | 0 ->
+                        cellsNode.DeselectCell cell
+                        selectCell cellsNode cursorCell
+                        c.AddResource("State", Selected(cursorCell, None))
+                    | 1 ->
+                        cellsNode.DeselectCell cell
+                        selectCell cellsNode cursorCell
+                        c.AddResource("State", Selected(cursorCell, Some(entitiesAtCell.[0])))
+                    | _ -> showContextMenuForCell (cursorCell)
 
-            let newState =
-                match state with
-                | Waiting ->
-                    match event.Button with
-                    | Select -> selectCursorCell ()
-                    | _ -> state
-                | Selected _ ->
-                    match event.Button with
-                    | Select -> selectCursorCell ()
-                    | Cancel -> deselectCell ()
-                // TODO: Attacking, Moving
-                | _ -> state
+                | None -> ()
+            | GameState.Waiting ->
+                let cellsNode = c.LoadResource<uint64>("CellsNode")
+                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
 
-            match newState with
-            | Waiting -> c.Send { SelectedCell = None }
-            | Selected (cell, _) -> c.Send { SelectedCell = Some(cell) }
+                match cellsNode.CursorCell with
+                | Some cursorCell ->
+                    let entitiesAtCell = getEntitiesAtCell cursorCell
+
+                    match entitiesAtCell.Length with
+                    | 0 ->
+                        selectCell cellsNode cursorCell
+                        c.AddResource("State", Selected(cursorCell, None))
+                    | 1 ->
+                        selectCell cellsNode cursorCell
+                        c.AddResource("State", Selected(cursorCell, Some(entitiesAtCell.[0])))
+                    | _ -> showContextMenuForCell (cursorCell)
+
+                | None -> ()
+            // TODO: Attacking, Moving
             | _ -> ()
 
-            c.AddResource("State", newState)
+        let handleCancel () =
+            match c.LoadResource<GameState>("State") with
+            | Selected (cell, _) ->
+                let cellsNode = c.LoadResource<uint64>("CellsNode")
+                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+                cellsNode.DeselectCell cell
+                c.AddResource("State", Waiting)
+                c.Send(UpdateSelection())
+            | _ -> ()
 
+        c.On<ButtonPressed>
+        <| fun event ->
+            match event.Button with
+            | Select -> handleSelect ()
+            | Cancel -> handleCancel ()
 
     let register (c: Container) =
         Disposable.Create [ registerUpdatePosition c

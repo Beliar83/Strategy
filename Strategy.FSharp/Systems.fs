@@ -13,4 +13,5 @@ type GameState =
     | Startup
     | NewRound
     | Waiting
+    | ContextMenu
     | Selected of Hexagon * Option<Eid>

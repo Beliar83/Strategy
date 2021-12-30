@@ -79,23 +79,9 @@ module UnitSystem =
                     unitsNode.AddChild node
                     entity.Add { NodeId = node.GetInstanceId() }
 
-            for entity in c.Query<Unit, Node, Hexagon>() do
-                let unit = entity.Value1
-                let node = entity.Value2
-
-                let node =
-                    GD.InstanceFromId(node.NodeId) :?> UnitNode
-
-                let cell = entity.Value3
-
-                node.Integrity <- unit.Integrity
-                node.Cell <- cell
-
-    let registerInput (c: Container) =
-        c.On<CellSelected>
-        <| fun selected ->
             for entity in c.Query<Eid, Unit, Node, Hexagon>() do
                 let id = entity.Value1
+                let unit = entity.Value2
                 let node = entity.Value3
 
                 let node =
@@ -103,15 +89,8 @@ module UnitSystem =
 
                 let cell = entity.Value4
 
-                match selected.SelectedCell with
-                | Some selected ->
-                    if (selected = cell) then
-                        node.Selected <- true
-                        c.AddResource("State", GameState.Selected(cell, Some(id)))
-                    else
-                        node.Selected <- false
-                | None -> node.Selected <- false
-
+                node.Integrity <- unit.Integrity
+                node.Cell <- cell
 
                 let entity = c.Get id
 
@@ -125,6 +104,29 @@ module UnitSystem =
                         node.Color <- players.[player.PlayerId].Color
                 else
                     node.Color <- Color.ColorN("Gray")
+
+    let registerInput (c: Container) =
+
+        c.On<UpdateSelection>
+        <| fun _ ->
+            let state = c.LoadResource<GameState>("State")
+
+            let is_selected =
+                match state with
+                | GameState.Selected (_, entity) ->
+                    match entity with
+                    | Some selected_id -> fun id -> id = selected_id
+                    | None -> fun _ -> false
+                | _ -> fun _ -> false
+
+            for entity in c.Query<Eid, Unit, Node, Hexagon>() do
+                let id = entity.Value1
+                let node = entity.Value3
+
+                let node =
+                    GD.InstanceFromId(node.NodeId) :?> UnitNode
+
+                node.Selected <- is_selected id
 
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c

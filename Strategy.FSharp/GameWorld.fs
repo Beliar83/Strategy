@@ -48,12 +48,18 @@ type GameWorld() =
 
     let mutable mapUI: NodePath = null
 
+    let mutable camera: NodePath = null
+
     member this.MapUI
         with get () = mapUI
         and set value = mapUI <- value
 
+    member this.Camera
+        with get () = camera
+        and set value = camera <- value
+
     override this._Ready() =
-        world.AddResource("MapRadius", 1)
+        world.AddResource("MapRadius", 20)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("CurrentPlayer", "Player1")
@@ -76,6 +82,12 @@ type GameWorld() =
 
         world.AddResource("Players", players)
 
+        let mapUI = this.GetNode(mapUI) :?> MapUI
+        world.AddResource("UINode", mapUI.GetInstanceId())
+
+        let camera = this.GetNode(camera) :?> Camera2D
+
+        world.AddResource("Camera", camera.GetInstanceId())
 
         UnitSystem.register world |> ignore
         NodesSystem.register |> ignore
@@ -98,13 +110,10 @@ type GameWorld() =
                         |> Array.map (fun c -> c.AsVector2)
 
                     cellsNode.Cells <- Array<Vector2>(cells)
-                    world.Send { SelectedCell = None }
 
                     world.AddResource("UpdateMap", false)
 
                 let state = world.LoadResource<GameState> "State"
-
-                let mapUI = this.GetNode(mapUI) :?> MapUI
 
                 match state with
                 | Waiting
@@ -129,9 +138,6 @@ type GameWorld() =
                     world.AddResource("CurrentPlayer", next_player)
                     world.AddResource("State", Waiting)
                 | _ -> ()
-
-
-
 
         world
             .Create()
@@ -184,31 +190,11 @@ type GameWorld() =
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
 
-    override this._Input(event) =
-        let camera =
-            this.GetNode<Camera2D>(new NodePath "/root/Root/Camera2D")
+    override this._UnhandledInput(event) =
+        let handleCursorMouseMotion (event: InputEventMouseMotion) =
+            world.AddResource("CursorPosition", event.Position)
 
-        let event = camera.MakeInputLocal event
-
-        match event with
-        | :? InputEventKey as event ->
-            let scancode = enum<KeyList> (int32 event.Scancode)
-
-            if not event.Pressed then
-                match scancode with
-                | KeyList.Plus
-                | KeyList.KpAdd ->
-                    let radius = world.LoadResource<int> "MapRadius"
-                    world.AddResource("MapRadius", radius + 1)
-                    world.AddResource("UpdateMap", true)
-                | KeyList.Minus
-                | KeyList.KpSubtract ->
-                    let radius = world.LoadResource<int> "MapRadius"
-                    world.AddResource("MapRadius", max 1 (radius - 1))
-                    world.AddResource("UpdateMap", true)
-                | _ -> ()
-        | :? InputEventMouseMotion as event -> world.AddResource("CursorPosition", event.Position)
-        | :? InputEventMouseButton as event ->
+        let sendButtonFromMouseButton (event: InputEventMouseButton) =
             let button =
                 enum<ButtonList> (int32 event.ButtonIndex)
 
@@ -218,4 +204,34 @@ type GameWorld() =
                 | ButtonList.Right -> world.Send <| { Button = Button.Cancel }
                 | _ -> ()
 
+        let handleWaiting (event: InputEvent) =
+            match event with
+            | :? InputEventMouseMotion as event -> handleCursorMouseMotion event
+            | :? InputEventMouseButton as event -> sendButtonFromMouseButton event
+            | :? InputEventAction as event ->
+                match event.Action with
+                | "ui_select" -> world.Send <| { Button = Button.Select }
+                | "ui_cancel" -> world.Send <| { Button = Button.Cancel }
+                | _ -> ()
+            | _ -> ()
+
+        let handleSelected (event: InputEvent) (cell: Hexagon) (entity: Option<Eid>) =
+            match event with
+            | :? InputEventMouseMotion as event -> handleCursorMouseMotion event
+            | :? InputEventMouseButton as event -> sendButtonFromMouseButton event
+            | :? InputEventAction as event ->
+                match event.Action with
+                | "ui_select" -> world.Send <| { Button = Button.Select }
+                | "ui_cancel" -> world.Send <| { Button = Button.Cancel }
+                | _ -> ()
+            | _ -> ()
+
+        let camera =
+            this.GetNode<Camera2D>(new NodePath "/root/Root/Camera2D")
+
+        let event = camera.MakeInputLocal event
+
+        match world.LoadResource<GameState> "State" with
+        | Waiting -> handleWaiting event
+        | Selected (cell, entity) -> handleSelected event cell entity
         | _ -> ()
