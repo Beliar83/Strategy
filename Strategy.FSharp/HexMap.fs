@@ -1,5 +1,6 @@
 ﻿module Strategy.FSharp.HexMap
 
+open Garnet.Composition.Join
 open Godot
 open Godot.Collections
 open Strategy.FSharp.Hexagon
@@ -7,6 +8,7 @@ open Garnet.Composition
 open Strategy.FSharp.Input
 open Strategy.FSharp.MapUI
 open Strategy.FSharp.Systems
+open Strategy.FSharp.Unit
 
 let PolygonWidth cellSize = sqrt 3f * cellSize
 
@@ -29,13 +31,6 @@ let HexagonPoints cellSize =
        Vector2(0f, halfHeight)
        Vector2(-halfWidth, quarterHeight)
        Vector2(-halfWidth, -quarterHeight) |]
-
-type UpdateSelection =
-    struct
-
-    end
-
-
 
 type HexMap() =
     inherit Node2D()
@@ -163,25 +158,46 @@ module HexMapSystem =
         let handleSelect () =
             let state = c.LoadResource<GameState>("State")
 
+            let getEntitiesAtCell (cell: Hexagon) =
+                c.Query<Eid, Hexagon>()
+                |> Seq.filter (fun x -> x.Value2 = cell)
+                |> Seq.map (fun x -> c.Get x.Value1)
+                |> Seq.toArray
+
+
             let showContextMenuForCell (cell: Hexagon) =
                 // Add actual items
                 let uiNode = c.LoadResource<uint64>("UINode")
                 let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
 
                 let texture =
-                    ResourceLoader.Load<Texture>("res://icon.png")
+                    ResourceLoader.Load<Texture>("res://assets/icons/simpleBlock.png")
 
-                let item1 = new Dictionary()
-                item1.Add("texture", texture)
-                item1.Add("title", "Test")
-                item1.Add("id", "test")
+                let endTurnItem = new Dictionary()
+                endTurnItem.Add("texture", texture)
+                endTurnItem.Add("title", "End Turn")
+                endTurnItem.Add("id", "EndTurn")
 
-                let item2 = new Dictionary()
-                item2.Add("texture", texture)
-                item2.Add("title", "Test 2")
-                item2.Add("id", "test2")
+                let items = [| endTurnItem |]
 
-                let items = [| item1; item2 |]
+                let getItemForUnit (entity: Entity) (unit: Unit) =
+                    let texture =
+                        ResourceLoader.Load<Texture>("res://assets/units/tank.png")
+
+                    let item = new Dictionary()
+                    item.Add("texture", texture)
+                    item.Add("title", "Unit")
+                    item.Add("id", new Array("Entity", entity.Id.Value))
+                    item
+
+                let entities = getEntitiesAtCell cell
+
+                let items =
+                    entities
+                    |> Array.filter (fun entity -> entity.Has<Unit>())
+                    |> Array.map (fun entity -> getItemForUnit entity (entity.Get<Unit>()))
+                    |> Array.append items
+
 
                 let position = cell.Get2DPosition
 
@@ -193,72 +209,51 @@ module HexMapSystem =
 
                 c.AddResource("State", GameState.ContextMenu)
 
+                let selectCell (hexMap: HexMap) (cell: Hexagon) =
+                    hexMap.SelectCell cell
+                    c.Send(UpdateSelection())
 
                 async {
                     let! result = uiNode.ShowRadialMenu items position
 
                     match result with
                     | Some id ->
-                        GD.Print id.[0]
-                        c.AddResource("State", GameState.Waiting)
+                        match id.[0] with
+                        | :? Array as array ->
+                            let item_type = array.Item 0 |> fun i -> i.ToString()
+
+                            match item_type with
+                            | "Entity" ->
+                                let cellsNode = c.LoadResource<uint64>("CellsNode")
+                                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+                                let entity_entity = array.Item 1 |> fun et -> et :?> int
+                                c.AddResource("State", GameState.Selected(cell, Some(Eid(entity_entity))))
+
+                                match state with
+                                | Selected (cell, _) -> cellsNode.DeselectCell cell
+                                | _ -> ()
+
+                                selectCell cellsNode cell
+                            | _ -> c.AddResource("State", GameState.Waiting)
+                        | _ -> c.AddResource("State", state)
                     | None ->
                         GD.Print "Cancelled"
-                        c.AddResource("State", GameState.Waiting)
+                        c.AddResource("State", state)
                         c.AddResource("CursorPosition", camera.GetLocalMousePosition())
 
                 }
                 |> Async.StartImmediate
 
-            let getEntitiesAtCell (cell: Hexagon) =
-                c.Query<Eid, Hexagon>()
-                |> Seq.filter (fun x -> x.Value2 = cell)
-                |> Seq.map (fun x -> x.Value1)
-                |> Seq.toArray
-
-            let selectCell (hexMap: HexMap) (cell: Hexagon) =
-                hexMap.SelectCell cell
-                c.Send(UpdateSelection())
-
             match state with
             | GameState.Startup -> ()
             | GameState.NewRound -> ()
-            | GameState.Selected (cell, _) ->
-                let cellsNode = c.LoadResource<uint64>("CellsNode")
-                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
-
-                match cellsNode.CursorCell with
-                | Some cursorCell ->
-                    let entitiesAtCell = getEntitiesAtCell cursorCell
-
-                    match entitiesAtCell.Length with
-                    | 0 ->
-                        cellsNode.DeselectCell cell
-                        selectCell cellsNode cursorCell
-                        c.AddResource("State", Selected(cursorCell, None))
-                    | 1 ->
-                        cellsNode.DeselectCell cell
-                        selectCell cellsNode cursorCell
-                        c.AddResource("State", Selected(cursorCell, Some(entitiesAtCell.[0])))
-                    | _ -> showContextMenuForCell (cursorCell)
-
-                | None -> ()
+            | GameState.Selected _
             | GameState.Waiting ->
                 let cellsNode = c.LoadResource<uint64>("CellsNode")
                 let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
 
                 match cellsNode.CursorCell with
-                | Some cursorCell ->
-                    let entitiesAtCell = getEntitiesAtCell cursorCell
-
-                    match entitiesAtCell.Length with
-                    | 0 ->
-                        selectCell cellsNode cursorCell
-                        c.AddResource("State", Selected(cursorCell, None))
-                    | 1 ->
-                        selectCell cellsNode cursorCell
-                        c.AddResource("State", Selected(cursorCell, Some(entitiesAtCell.[0])))
-                    | _ -> showContextMenuForCell (cursorCell)
-
+                | Some cursorCell -> showContextMenuForCell cursorCell
                 | None -> ()
             // TODO: Attacking, Moving
             | _ -> ()

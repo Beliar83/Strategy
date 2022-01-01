@@ -11,3 +11,8 @@ type CursorMoved = { CursorCell: Hexagon }
 
 [<Struct>]
 type ButtonPressed = { Button: Button }
+
+type UpdateSelection =
+    struct
+
+    end

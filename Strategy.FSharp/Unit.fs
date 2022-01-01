@@ -3,8 +3,8 @@
 open System
 open Godot
 open Garnet.Composition
-open Strategy.FSharp.HexMap
 open Strategy.FSharp.Hexagon
+open Strategy.FSharp.Input
 open Strategy.FSharp.Player
 open Strategy.FSharp.Systems
 open Strategy.FSharp.Nodes
