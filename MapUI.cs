@@ -2,7 +2,7 @@ using Godot;
 
 namespace Strategy
 {
-    public class MapUI : FSharp.MapUI.MapUI
+    public partial class MapUI : FSharp.MapUI.MapUI
     {
         [Export((PropertyHint)35, "Label")]
         public new NodePath PlayerLabel

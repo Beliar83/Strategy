@@ -45,10 +45,10 @@ type HexMap() =
         (GD.InstanceFromId cellNodes.[cell])
             .EmitSignal signal
 
-    let emitCellSelected = emitCellSignal "selected"
-    let emitCellDeselected = emitCellSignal "deselected"
-    let emitCursorEnteredCell = emitCellSignal "cursor_entered"
-    let emitCursorExitedCell = emitCellSignal "cursor_exited"
+    let emitCellSelected = emitCellSignal (new StringName "selected")
+    let emitCellDeselected = emitCellSignal (new StringName "deselected")
+    let emitCursorEnteredCell = emitCellSignal (new StringName "cursor_entered")
+    let emitCursorExitedCell = emitCellSignal (new StringName "cursor_exited")
 
     member this.Cells
         with get () = cells
@@ -60,11 +60,11 @@ type HexMap() =
 
     member this.SelectCell(cell: Hexagon) =
         if cellNodes.ContainsKey(cell) then
-            emitCellSelected cell
+            emitCellSelected cell |> ignore
 
     member this.DeselectCell(cell) =
         if cellNodes.ContainsKey(cell) then
-            emitCellDeselected cell
+            emitCellDeselected cell |> ignore
 
 
     member this.UpdateCells() =
@@ -83,13 +83,13 @@ type HexMap() =
         cellNodes.Clear()
 
         for cell in this.Cells do
-            let node = hexagon.Instance() :?> Node2D
+            let node = hexagon.Instantiate() :?> Node2D
             let cell = Hexagon.FromVector2 cell
             node.Position <- cell.Get2DPosition
             node.Set("Cell", Vector3(float32 cell.Q, float32 cell.R, float32 cell.S))
             cellNodes.[cell] <- node.GetInstanceId()
             this.AddChild node
-            this.Update()
+            this.QueueRedraw()
 
     member this.GetCellAtPosition(position: Vector2) = Hexagon.At2DPosition position
 
@@ -103,12 +103,12 @@ type HexMap() =
             match cursorCell with
             | Some currentCell ->
                 if cellNodes.ContainsKey(currentCell) then
-                    emitCursorExitedCell currentCell
+                    emitCursorExitedCell currentCell |> ignore
             | None -> ()
 
             if cellNodes.ContainsKey(cell) then
                 cursorCell <- Some(cell)
-                emitCursorEnteredCell cell
+                emitCursorEnteredCell cell  |> ignore
             else
                 cursorCell <- None
 
@@ -171,10 +171,10 @@ module HexMapSystem =
                 let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
 
                 let texture =
-                    ResourceLoader.Load<Texture>("res://assets/icons/simpleBlock.png")
-
+                    ResourceLoader.Load<Texture>("res://assets/icons/simpleBlock.png")                
+                
                 let endTurnItem = new Dictionary()
-                endTurnItem.Add("texture", texture)
+                endTurnItem.Add("texture", Variant.CreateFrom texture)
                 endTurnItem.Add("title", "End Turn")
                 endTurnItem.Add("id", "EndTurn")
 
@@ -183,11 +183,11 @@ module HexMapSystem =
                 let getItemForUnit (entity: Entity) (unit: Unit) =
                     let texture =
                         ResourceLoader.Load<Texture>("res://assets/units/tank.png")
-
+                      
                     let item = new Dictionary()
-                    item.Add("texture", texture)
+                    item.Add("texture", Variant.CreateFrom texture)
                     item.Add("title", "Unit")
-                    item.Add("id", new Array("Entity", entity.Id.Value))
+                    item.Add("id", new Array([Variant.CreateFrom "Entity"; Variant.CreateFrom entity.Id.Value]))
                     item
 
                 let entities = getEntitiesAtCell cell
@@ -218,16 +218,18 @@ module HexMapSystem =
 
                     match result with
                     | Some id ->
-                        match id.[0] with
-                        | :? Array as array ->
+                        let value = id.[0]
+                        match value.VariantType with
+                        | Variant.Type.Array ->
+                            let array = value.AsGodotArray()
                             let item_type = array.Item 0 |> fun i -> i.ToString()
 
                             match item_type with
                             | "Entity" ->
                                 let cellsNode = c.LoadResource<uint64>("CellsNode")
                                 let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
-                                let entity_entity = array.Item 1 |> fun et -> et :?> int
-                                c.AddResource("State", GameState.Selected(cell, Some(Eid(entity_entity))))
+                                let entity_id = array.Item 1 |> fun et -> et.AsInt32()
+                                c.AddResource("State", GameState.Selected(cell, Some(Eid(entity_id))))
 
                                 match state with
                                 | Selected (cell, _) -> cellsNode.DeselectCell cell

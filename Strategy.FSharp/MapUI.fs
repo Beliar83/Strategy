@@ -41,7 +41,7 @@ type MapUI() =
             let playerNameLabel = this.GetNode(player_label) :?> Label
 
             playerNameLabel.Text <- name
-            playerNameLabel.AddColorOverride("font_color", player.Color)
+            playerNameLabel.AddThemeColorOverride("font_color", player.Color)
 
     member this.ResetPlayer() =
         match player_label with

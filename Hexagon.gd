@@ -25,9 +25,9 @@ func _on_deselected():
 	$Hexagon/Selected.visible = false
 	
 func _on_cursor_entered():
-	$Hexagon/Outline.default_color = Color.white
+	$Hexagon/Outline.default_color = Color.WHITE
 	$Hexagon/Outline.z_index = 2
 	
 func _on_cursor_exited():
-	$Hexagon/Outline.default_color = Color.black
+	$Hexagon/Outline.default_color = Color.BLACK
 	$Hexagon/Outline.z_index = 1

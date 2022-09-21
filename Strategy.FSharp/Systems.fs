@@ -4,7 +4,7 @@ open Garnet.Composition
 open Strategy.FSharp.Hexagon
 
 [<Struct>]
-type Update = { UpdateTime: float32 }
+type Update = { UpdateTime: float }
 
 [<Struct>]
 type Position = { X: float32; Y: float32 }

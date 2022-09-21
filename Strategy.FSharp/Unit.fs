@@ -73,7 +73,7 @@ module UnitSystem =
                     let node =
                         GD.Load "res://Unit.tscn" :?> PackedScene
 
-                    let node = node.Instance() :?> UnitNode
+                    let node = node.Instantiate() :?> UnitNode
                     entity.Add { NodeId = node.GetInstanceId() }
                     node.Position <- cell.Get2DPosition
                     unitsNode.AddChild node
@@ -103,7 +103,7 @@ module UnitSystem =
                     if players.ContainsKey(player.PlayerId) then
                         node.Color <- players.[player.PlayerId].Color
                 else
-                    node.Color <- Color.ColorN("Gray")
+                    node.Color <- Colors.Gray
 
     let registerInput (c: Container) =
 

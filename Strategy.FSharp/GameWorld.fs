@@ -77,8 +77,8 @@ type GameWorld() =
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
         let players =
-            Map [ "Player1", { Color = Color.ColorN "Red" }
-                  "Player2", { Color = Color.ColorN "Blue" } ]
+            Map [ "Player1", { Color = Colors.Red }
+                  "Player2", { Color = Colors.Blue } ]
 
         world.AddResource("Players", players)
 
@@ -195,13 +195,10 @@ type GameWorld() =
             world.AddResource("CursorPosition", event.Position)
 
         let sendButtonFromMouseButton (event: InputEventMouseButton) =
-            let button =
-                enum<ButtonList> (int32 event.ButtonIndex)
-
             if not <| event.IsPressed() then
-                match button with
-                | ButtonList.Left -> world.Send <| { Button = Button.Select }
-                | ButtonList.Right -> world.Send <| { Button = Button.Cancel }
+                match event.ButtonIndex with
+                | MouseButton.Left -> world.Send <| { Button = Button.Select }
+                | MouseButton.Right -> world.Send <| { Button = Button.Cancel }
                 | _ -> ()
 
         let handleWaiting (event: InputEvent) =
@@ -209,7 +206,7 @@ type GameWorld() =
             | :? InputEventMouseMotion as event -> handleCursorMouseMotion event
             | :? InputEventMouseButton as event -> sendButtonFromMouseButton event
             | :? InputEventAction as event ->
-                match event.Action with
+                match event.Action.ToString() with
                 | "ui_select" -> world.Send <| { Button = Button.Select }
                 | "ui_cancel" -> world.Send <| { Button = Button.Cancel }
                 | _ -> ()
@@ -220,7 +217,7 @@ type GameWorld() =
             | :? InputEventMouseMotion as event -> handleCursorMouseMotion event
             | :? InputEventMouseButton as event -> sendButtonFromMouseButton event
             | :? InputEventAction as event ->
-                match event.Action with
+                match event.Action.ToString() with
                 | "ui_select" -> world.Send <| { Button = Button.Select }
                 | "ui_cancel" -> world.Send <| { Button = Button.Cancel }
                 | _ -> ()
