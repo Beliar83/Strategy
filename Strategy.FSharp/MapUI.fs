@@ -1,9 +1,22 @@
 ﻿module Strategy.FSharp.MapUI
 
 open System
+open Garnet.Composition
 open Godot
-open Godot.Collections
+open Microsoft.FSharp.Core
 open Strategy.FSharp.Player
+
+type ItemType =
+    | Entity of Eid
+    | Command of String
+
+type MenuItem = {
+    icon_path: string
+    label: string
+    item_type: ItemType
+}
+    
+    
 
 type MapUI() =
     inherit MarginContainer()
@@ -51,40 +64,27 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: Dictionary []) (position: Vector2) =
+    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2) (selected: ItemType -> Unit) (cancelled: Unit -> Unit) =
         match radial_menu with
         | None ->
             GD.PrintErr("MapUI: RadialMenu is not set")
-            async { return None }
         | Some radial_menu ->
-            let items =
-                let array = new Array<Dictionary>()
-
-                for item in items do
-                    array.Add(item)
-
-                array
-
-            let radial_menu = this.GetNode(radial_menu) :?> Popup
-            radial_menu.Set("menu_items", items)
-            radial_menu.Call("open_menu", position) |> ignore
-
-            async {
-                let item_selected =
-                    radial_menu.ToSignal(radial_menu, "item_selected")
-
-                let cancelled =
-                    radial_menu.ToSignal(radial_menu, "cancelled")
-
-                while not item_selected.IsCompleted
-                      && not cancelled.IsCompleted do
-                    Async.Sleep(TimeSpan.FromMilliseconds(1000.0))
-                    |> ignore
-
-                if item_selected.IsCompleted then
-                    return Some(item_selected.GetResult())
-                else
-                    return None
-            }
-            |> Async.StartChild
-            |> Async.RunSynchronously
+            
+            let radial_menu = this.GetNode(radial_menu) :?> PopupMenu
+            radial_menu.Clear()
+            
+            
+            items
+            |> List.iteri (fun index item ->
+                let icon = ResourceLoader.Load<Texture2D>(item.icon_path)
+                radial_menu.AddIconItem(icon, item.label, index)
+                )
+            
+            radial_menu.ToSignal(radial_menu, "popup_hide").OnCompleted(fun () -> 
+                let index = radial_menu.GetFocusedItem()
+                if index >= 0 then selected items[index].item_type
+                else cancelled()
+                    
+            )
+            
+            radial_menu.Popup()

@@ -170,25 +170,19 @@ module HexMapSystem =
                 let uiNode = c.LoadResource<uint64>("UINode")
                 let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
 
-                let texture =
-                    ResourceLoader.Load<Texture>("res://assets/icons/simpleBlock.png")                
-                
-                let endTurnItem = new Dictionary()
-                endTurnItem.Add("texture", Variant.CreateFrom texture)
-                endTurnItem.Add("title", "End Turn")
-                endTurnItem.Add("id", "EndTurn")
+                let endTurnItem = {
+                    icon_path = "res://assets/icons/simpleBlock.png"
+                    label = "End Turn"
+                    item_type = ItemType.Command "EndTurn"                    
+                }
 
-                let items = [| endTurnItem |]
+                let items = [||]
 
-                let getItemForUnit (entity: Entity) (unit: Unit) =
-                    let texture =
-                        ResourceLoader.Load<Texture>("res://assets/units/tank.png")
-                      
-                    let item = new Dictionary()
-                    item.Add("texture", Variant.CreateFrom texture)
-                    item.Add("title", "Unit")
-                    item.Add("id", new Array([Variant.CreateFrom "Entity"; Variant.CreateFrom entity.Id.Value]))
-                    item
+                let getItemForUnit (entity: Entity) (unit: Unit) = {
+                     icon_path = "res://assets/units/tank.png"
+                     label = "Unit"
+                     item_type = ItemType.Entity(entity.Id)
+                     }                    
 
                 let entities = getEntitiesAtCell cell
 
@@ -197,7 +191,8 @@ module HexMapSystem =
                     |> Array.filter (fun entity -> entity.Has<Unit>())
                     |> Array.map (fun entity -> getItemForUnit entity (entity.Get<Unit>()))
                     |> Array.append items
-
+                
+                let items = Array.append items [|endTurnItem|]
 
                 let position = cell.Get2DPosition
 
@@ -213,38 +208,30 @@ module HexMapSystem =
                     hexMap.SelectCell cell
                     c.Send(UpdateSelection())
 
-                async {
-                    let! result = uiNode.ShowRadialMenu items position
+                
+                
+                let handle_selected (item_type: ItemType) =
+                        match item_type with
+                        | Entity entity_id ->
+                            let cellsNode = c.LoadResource<uint64>("CellsNode")
+                            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+                            c.AddResource("State", GameState.Selected(cell, Some(entity_id)))
 
-                    match result with
-                    | Some id ->
-                        let value = id.[0]
-                        match value.VariantType with
-                        | Variant.Type.Array ->
-                            let array = value.AsGodotArray()
-                            let item_type = array.Item 0 |> fun i -> i.ToString()
+                            match state with
+                            | Selected (cell, _) -> cellsNode.DeselectCell cell
+                            | _ -> ()
 
-                            match item_type with
-                            | "Entity" ->
-                                let cellsNode = c.LoadResource<uint64>("CellsNode")
-                                let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
-                                let entity_id = array.Item 1 |> fun et -> et.AsInt32()
-                                c.AddResource("State", GameState.Selected(cell, Some(Eid(entity_id))))
-
-                                match state with
-                                | Selected (cell, _) -> cellsNode.DeselectCell cell
-                                | _ -> ()
-
-                                selectCell cellsNode cell
-                            | _ -> c.AddResource("State", GameState.Waiting)
-                        | _ -> c.AddResource("State", state)
-                    | None ->
-                        GD.Print "Cancelled"
-                        c.AddResource("State", state)
-                        c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-
-                }
-                |> Async.StartImmediate
+                            selectCell cellsNode cell
+                        | Command _command ->
+                            c.AddResource("State", state)
+                            c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+                
+                let handle_cancelled() =
+                    c.AddResource("State", state)
+                    c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+                    GD.Print "Cancelled"
+                    
+                uiNode.ShowRadialMenu (Array.toList items) position handle_selected handle_cancelled
 
             match state with
             | GameState.Startup -> ()
