@@ -10,13 +10,9 @@ type ItemType =
     | Entity of Eid
     | Command of String
 
-type MenuItem = {
-    icon_path: string
-    label: string
-    item_type: ItemType
-}
-    
-    
+type MenuItem =
+    | Item of label: String * item_type: ItemType
+    | IconItem of icon_path: string * label: string * item_type: ItemType        
 
 type MapUI() =
     inherit MarginContainer()
@@ -64,7 +60,7 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2) (selected: ItemType -> Unit) (cancelled: Unit -> Unit) =
+    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2) (selected: ItemType -> Unit) (closed: Unit -> Unit) =
         match radial_menu with
         | None ->
             GD.PrintErr("MapUI: RadialMenu is not set")
@@ -76,14 +72,21 @@ type MapUI() =
             
             items
             |> List.iteri (fun index item ->
-                let icon = ResourceLoader.Load<Texture2D>(item.icon_path)
-                radial_menu.AddIconItem(icon, item.label, index)
+                match item with
+                | IconItem(iconPath, label, _) ->                
+                    let icon = ResourceLoader.Load<Texture2D>(iconPath)
+                    radial_menu.AddIconItem(icon, label, index)
+                | Item(label, _) ->
+                    radial_menu.AddItem(label, index)
                 )
             
             radial_menu.ToSignal(radial_menu, "popup_hide").OnCompleted(fun () -> 
                 let index = radial_menu.GetFocusedItem()
-                if index >= 0 then selected items[index].item_type
-                else cancelled()
+                if index >= 0 then
+                    match items[index] with
+                    | IconItem(_, _, itemType) -> selected itemType
+                    | Item(_, itemType) -> selected itemType
+                else closed()
                     
             )
             

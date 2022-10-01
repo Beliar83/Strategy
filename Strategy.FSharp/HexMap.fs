@@ -170,19 +170,10 @@ module HexMapSystem =
                 let uiNode = c.LoadResource<uint64>("UINode")
                 let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
 
-                let endTurnItem = {
-                    icon_path = "res://assets/icons/simpleBlock.png"
-                    label = "End Turn"
-                    item_type = ItemType.Command "EndTurn"                    
-                }
-
                 let items = [||]
 
-                let getItemForUnit (entity: Entity) (unit: Unit) = {
-                     icon_path = "res://assets/units/tank.png"
-                     label = "Unit"
-                     item_type = ItemType.Entity(entity.Id)
-                     }                    
+                let getItemForUnit (entity: Entity) (unit: Unit) =
+                     MenuItem.IconItem("res://assets/units/tank.png", "Unit", ItemType.Entity(entity.Id))
 
                 let entities = getEntitiesAtCell cell
 
@@ -192,7 +183,8 @@ module HexMapSystem =
                     |> Array.map (fun entity -> getItemForUnit entity (entity.Get<Unit>()))
                     |> Array.append items
                 
-                let items = Array.append items [|endTurnItem|]
+                let items = Array.append items [|MenuItem.IconItem ("res://assets/icons/simpleBlock.png", "End Turn", ItemType.Command "EndTurn")|]
+                let items = Array.append items [|MenuItem.Item ("Close", ItemType.Command "Close")|]
 
                 let position = cell.Get2DPosition
 
@@ -222,16 +214,25 @@ module HexMapSystem =
                             | _ -> ()
 
                             selectCell cellsNode cell
-                        | Command _command ->
-                            c.AddResource("State", state)
-                            c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-                
-                let handle_cancelled() =
+                        | Command command ->
+                            match command with
+                            | "EndTurn" ->
+                                // TODO: Actually end the turn
+                                c.AddResource("State", state)
+                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+                            | "Close" ->
+                                c.AddResource("State", state)
+                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+                            | _ ->
+                                GD.PrintErr $"Unknown command: {command}"
+                                c.AddResource("State", state)
+                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())                              
+
+                let handle_closed() =
                     c.AddResource("State", state)
                     c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-                    GD.Print "Cancelled"
                     
-                uiNode.ShowRadialMenu (Array.toList items) position handle_selected handle_cancelled
+                uiNode.ShowRadialMenu (Array.toList items) position handle_selected handle_closed
 
             match state with
             | GameState.Startup -> ()
