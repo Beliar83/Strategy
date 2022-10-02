@@ -60,7 +60,7 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2) (selected: ItemType -> Unit) (closed: Unit -> Unit) =
+    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2i) (selected: ItemType -> Unit) (closed: Unit -> Unit) =
         match radial_menu with
         | None ->
             GD.PrintErr("MapUI: RadialMenu is not set")
@@ -80,6 +80,8 @@ type MapUI() =
                     radial_menu.AddItem(label, index)
                 )
             
+            radial_menu.ResetSize()
+            
             radial_menu.ToSignal(radial_menu, "popup_hide").OnCompleted(fun () -> 
                 let index = radial_menu.GetFocusedItem()
                 if index >= 0 then
@@ -90,4 +92,5 @@ type MapUI() =
                     
             )
             
+            radial_menu.Position <- position
             radial_menu.Popup()

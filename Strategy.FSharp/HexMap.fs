@@ -232,7 +232,7 @@ module HexMapSystem =
                     c.AddResource("State", state)
                     c.AddResource("CursorPosition", camera.GetLocalMousePosition())
                     
-                uiNode.ShowRadialMenu (Array.toList items) position handle_selected handle_closed
+                uiNode.ShowRadialMenu (Array.toList items) (Vector2i.op_Explicit(position)) handle_selected handle_closed
 
             match state with
             | GameState.Startup -> ()
