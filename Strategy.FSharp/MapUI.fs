@@ -1,18 +1,18 @@
 ﻿module Strategy.FSharp.MapUI
 
 open System
-open Garnet.Composition
 open Godot
 open Microsoft.FSharp.Core
 open Strategy.FSharp.Player
 
 type ItemType =
-    | Entity of Eid
-    | Command of String
+    | Item
+    | IconItem of icon_path: string
 
 type MenuItem =
-    | Item of label: String * item_type: ItemType
-    | IconItem of icon_path: string * label: string * item_type: ItemType        
+    { label: String
+      command: Unit -> Unit
+      item_type: ItemType }
 
 type MapUI() =
     inherit MarginContainer()
@@ -60,37 +60,35 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2i) (selected: ItemType -> Unit) (closed: Unit -> Unit) =
+    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2i) (closed: Unit -> Unit) =
         match radial_menu with
-        | None ->
-            GD.PrintErr("MapUI: RadialMenu is not set")
+        | None -> GD.PrintErr("MapUI: RadialMenu is not set")
         | Some radial_menu ->
-            
+
             let radial_menu = this.GetNode(radial_menu) :?> PopupMenu
             radial_menu.Clear()
-            
-            
+
             items
-            |> List.iteri (fun index item ->
-                match item with
-                | IconItem(iconPath, label, _) ->                
-                    let icon = ResourceLoader.Load<Texture2D>(iconPath)
-                    radial_menu.AddIconItem(icon, label, index)
-                | Item(label, _) ->
-                    radial_menu.AddItem(label, index)
-                )
-            
+            |> List.iteri
+                (fun index item ->
+                    match item.item_type with
+                    | IconItem (iconPath) ->
+                        let icon = ResourceLoader.Load<Texture2D>(iconPath)
+                        radial_menu.AddIconItem(icon, item.label, index)
+                    | Item -> radial_menu.AddItem(item.label, index))
+
             radial_menu.ResetSize()
-            
-            radial_menu.ToSignal(radial_menu, "popup_hide").OnCompleted(fun () -> 
-                let index = radial_menu.GetFocusedItem()
-                if index >= 0 then
-                    match items[index] with
-                    | IconItem(_, _, itemType) -> selected itemType
-                    | Item(_, itemType) -> selected itemType
-                else closed()
-                    
-            )
-            
+
+            radial_menu
+                .ToSignal(radial_menu, "popup_hide")
+                .OnCompleted(fun () ->
+                    let index = radial_menu.GetFocusedItem()
+
+                    if index >= 0 then
+                        let item = List.item index items
+                        item.command ()
+                    else
+                        closed ())
+
             radial_menu.Position <- position
             radial_menu.Popup()

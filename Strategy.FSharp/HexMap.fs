@@ -45,10 +45,17 @@ type HexMap() =
         (GD.InstanceFromId cellNodes.[cell])
             .EmitSignal signal
 
-    let emitCellSelected = emitCellSignal (new StringName "selected")
-    let emitCellDeselected = emitCellSignal (new StringName "deselected")
-    let emitCursorEnteredCell = emitCellSignal (new StringName "cursor_entered")
-    let emitCursorExitedCell = emitCellSignal (new StringName "cursor_exited")
+    let emitCellSelected =
+        emitCellSignal (new StringName "selected")
+
+    let emitCellDeselected =
+        emitCellSignal (new StringName "deselected")
+
+    let emitCursorEnteredCell =
+        emitCellSignal (new StringName "cursor_entered")
+
+    let emitCursorExitedCell =
+        emitCellSignal (new StringName "cursor_exited")
 
     member this.Cells
         with get () = cells
@@ -108,7 +115,7 @@ type HexMap() =
 
             if cellNodes.ContainsKey(cell) then
                 cursorCell <- Some(cell)
-                emitCursorEnteredCell cell  |> ignore
+                emitCursorEnteredCell cell |> ignore
             else
                 cursorCell <- None
 
@@ -172,19 +179,34 @@ module HexMapSystem =
 
                 let items = [||]
 
-                let getItemForUnit (entity: Entity) (unit: Unit) =
-                     MenuItem.IconItem("res://assets/units/tank.png", "Unit", ItemType.Entity(entity.Id))
-
                 let entities = getEntitiesAtCell cell
+
+                let selectCell (hexMap: HexMap) (cell: Hexagon) =
+                    hexMap.SelectCell cell
+                    c.Send(UpdateSelection())
+
+                let entity_command entity_id =
+                    let cellsNode = c.LoadResource<uint64>("CellsNode")
+                    let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
+                    c.AddResource("State", GameState.Selected(cell, Some(entity_id)))
+
+                    match state with
+                    | Selected (cell, _) -> cellsNode.DeselectCell cell
+                    | _ -> ()
+
+                    selectCell cellsNode cell
+
+                let getItemForUnit (entity: Entity) (unit: Unit) =
+                    { label = "Unit"
+                      command = (fun () -> entity_command entity.Id)
+                      item_type = ItemType.IconItem("res://assets/units/tank.png") }
 
                 let items =
                     entities
                     |> Array.filter (fun entity -> entity.Has<Unit>())
                     |> Array.map (fun entity -> getItemForUnit entity (entity.Get<Unit>()))
                     |> Array.append items
-                
-                let items = Array.append items [|MenuItem.IconItem ("res://assets/icons/simpleBlock.png", "End Turn", ItemType.Command "EndTurn")|]
-                let items = Array.append items [|MenuItem.Item ("Close", ItemType.Command "Close")|]
+
 
                 let position = cell.Get2DPosition
 
@@ -194,45 +216,32 @@ module HexMapSystem =
                 let half_size = rect.Size / 2f
                 let position = position + half_size
 
-                c.AddResource("State", GameState.ContextMenu)
-
-                let selectCell (hexMap: HexMap) (cell: Hexagon) =
-                    hexMap.SelectCell cell
-                    c.Send(UpdateSelection())
-
-                
-                
-                let handle_selected (item_type: ItemType) =
-                        match item_type with
-                        | Entity entity_id ->
-                            let cellsNode = c.LoadResource<uint64>("CellsNode")
-                            let cellsNode = GD.InstanceFromId(cellsNode) :?> HexMap
-                            c.AddResource("State", GameState.Selected(cell, Some(entity_id)))
-
-                            match state with
-                            | Selected (cell, _) -> cellsNode.DeselectCell cell
-                            | _ -> ()
-
-                            selectCell cellsNode cell
-                        | Command command ->
-                            match command with
-                            | "EndTurn" ->
-                                // TODO: Actually end the turn
-                                c.AddResource("State", state)
-                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-                            | "Close" ->
-                                c.AddResource("State", state)
-                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-                            | _ ->
-                                GD.PrintErr $"Unknown command: {command}"
-                                c.AddResource("State", state)
-                                c.AddResource("CursorPosition", camera.GetLocalMousePosition())                              
-
-                let handle_closed() =
+                let end_turn () =
+                    // TODO: Actually end the turn
                     c.AddResource("State", state)
                     c.AddResource("CursorPosition", camera.GetLocalMousePosition())
-                    
-                uiNode.ShowRadialMenu (Array.toList items) (Vector2i.op_Explicit(position)) handle_selected handle_closed
+
+                let close () =
+                    c.AddResource("State", state)
+                    c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+
+                let items =
+                    Array.append
+                        items
+                        [| { label = "End Turn"
+                             command = end_turn
+                             item_type = ItemType.IconItem "res://assets/icons/simpleBlock.png" } |]
+
+                let items =
+                    Array.append
+                        items
+                        [| { label = "Close"
+                             command = close
+                             item_type = ItemType.Item } |]
+
+                c.AddResource("State", GameState.ContextMenu)
+
+                uiNode.ShowRadialMenu(Array.toList items) (Vector2i.op_Explicit (position)) close
 
             match state with
             | GameState.Startup -> ()
