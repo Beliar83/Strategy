@@ -7,21 +7,21 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Player.fs" />
-        <Compile Include="MapUI.fs" />
-        <Compile Include="Hexagon.fs" />
-        <Compile Include="Systems.fs" />
-        <Compile Include="Input.fs" />
-        <Compile Include="Nodes.fs" />
-        <Compile Include="Unit.fs" />
-        <Compile Include="HexMap.fs" />
-        <Compile Include="GameWorld.fs" />
-        <Compile Include="Library.fs" />
+        <Compile Include="Player.fs"/>
+        <Compile Include="Hexagon.fs"/>
+        <Compile Include="Systems.fs"/>
+        <Compile Include="MapUI.fs"/>
+        <Compile Include="Input.fs"/>
+        <Compile Include="Nodes.fs"/>
+        <Compile Include="Unit.fs"/>
+        <Compile Include="HexMap.fs"/>
+        <Compile Include="GameWorld.fs"/>
+        <Compile Include="Library.fs"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Garnet" Version="0.5.3" />
-        <PackageReference Include="GodotSharp" Version="4.0.0-beta2" />
+        <PackageReference Include="Garnet" Version="0.5.3"/>
+        <PackageReference Include="GodotSharp" Version="4.0.0-beta2"/>
     </ItemGroup>
 
 </Project>

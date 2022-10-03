@@ -20,25 +20,21 @@ PlayerLabel = NodePath("Top/PlayerName")
 RadialMenu = NodePath("PopupMenu")
 
 [node name="Top" type="VBoxContainer" parent="UILayer/UI"]
-layout_mode = 2
 offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 
 [node name="PlayerName" type="Label" parent="UILayer/UI/Top"]
-layout_mode = 2
 offset_right = 1152.0
 offset_bottom = 23.0
 
 [node name="Bottom" type="VBoxContainer" parent="UILayer/UI"]
-layout_mode = 2
 offset_right = 1152.0
 offset_bottom = 648.0
 mouse_filter = 2
 alignment = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UILayer/UI/Bottom"]
-layout_mode = 2
 offset_top = 648.0
 offset_right = 1152.0
 offset_bottom = 648.0
@@ -46,7 +42,6 @@ mouse_filter = 2
 alignment = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="UILayer/UI/Bottom/HBoxContainer"]
-layout_mode = 2
 offset_left = 1152.0
 offset_right = 1152.0
 mouse_filter = 2
@@ -63,7 +58,6 @@ Camera = NodePath("../Camera2D")
 
 [node name="Cells" type="Node2D" parent="GameWorld"]
 script = ExtResource("2")
-Cells = []
 
 [node name="Units" type="Node2D" parent="GameWorld"]
 

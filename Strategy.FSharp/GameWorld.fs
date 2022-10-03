@@ -4,7 +4,6 @@
 open System
 open System.Collections.Generic
 open Godot
-open Godot.Collections
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
 open Strategy.FSharp.HexMap
@@ -63,11 +62,11 @@ type GameWorld() =
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("CurrentPlayer", "Player1")
+        world.AddResource("WorldNode", this.GetInstanceId())
         let unitsNode = this.GetNode(new NodePath("Units"))
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
-        let cellsNode =
-            new NodePath("Cells") |> this.GetNode :?> HexMap
+        let cellsNode = new NodePath("Cells") |> this.GetNode
 
         world.AddResource("CellsNode", cellsNode.GetInstanceId())
 
@@ -89,9 +88,13 @@ type GameWorld() =
 
         world.AddResource("Camera", camera.GetInstanceId())
 
+        world.AddResource("CursorCell", Option<Hexagon>.None)
+        world.AddResource("CellNodes", Map.empty<Hexagon, uint64>)
+
         UnitSystem.register world |> ignore
         NodesSystem.register |> ignore
         HexMapSystem.register world |> ignore
+        MapUISystem.register world |> ignore
 
         update <-
             world.On<Update>
@@ -101,15 +104,8 @@ type GameWorld() =
                 if update_map then
                     let mapRadius = world.LoadResource<int>("MapRadius")
 
-                    let cellsNode =
-                        new NodePath("Cells") |> this.GetNode :?> HexMap
-
-
-                    let cells =
-                        CreateGrid mapRadius
-                        |> Array.map (fun c -> c.AsVector2)
-
-                    cellsNode.Cells <- Array<Vector2>(cells)
+                    world.AddResource("Cells", CreateGrid mapRadius)
+                    world.Send(CellsUpdated())
 
                     world.AddResource("UpdateMap", false)
 
@@ -134,9 +130,9 @@ type GameWorld() =
                         for player in players do
                             playerQueue.Enqueue(player.Key)
 
-                    let next_player = playerQueue.Dequeue
+                    let next_player = playerQueue.Dequeue()
                     world.AddResource("CurrentPlayer", next_player)
-                    world.AddResource("State", Waiting)
+                    ChangeState Waiting world
                 | _ -> ()
 
         world
@@ -186,6 +182,7 @@ type GameWorld() =
             .With(Hexagon.NewAxial 0 0)
         |> ignore
 
+        // First state needs to be set directly
         world.AddResource("State", GameState.NewRound)
 
     override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
@@ -212,7 +209,7 @@ type GameWorld() =
                 | _ -> ()
             | _ -> ()
 
-        let handleSelected (event: InputEvent) (cell: Hexagon) (entity: Option<Eid>) =
+        let handleSelected (event: InputEvent) _ _ =
             match event with
             | :? InputEventMouseMotion as event -> handleCursorMouseMotion event
             | :? InputEventMouseButton as event -> sendButtonFromMouseButton event

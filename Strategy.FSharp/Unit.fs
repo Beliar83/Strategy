@@ -4,7 +4,6 @@ open System
 open Godot
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
-open Strategy.FSharp.Input
 open Strategy.FSharp.Player
 open Strategy.FSharp.Systems
 open Strategy.FSharp.Nodes
@@ -101,33 +100,39 @@ module UnitSystem =
                         c.LoadResource<Map<String, PlayerData>> "Players"
 
                     if players.ContainsKey(player.PlayerId) then
-                        node.Color <- players.[player.PlayerId].Color
+                        node.Color <- players[player.PlayerId].Color
                 else
                     node.Color <- Colors.Gray
 
-    let registerInput (c: Container) =
+    let rec update_selection (container: Container) =
+        let state = container.LoadResource<GameState>("State")
 
-        c.On<UpdateSelection>
-        <| fun _ ->
-            let state = c.LoadResource<GameState>("State")
+        let is_selected =
+            match state with
+            | GameState.Selected (_, entity) ->
+                match entity with
+                | Some selected_id -> fun id -> id = selected_id
+                | None -> fun _ -> false
+            | _ -> fun _ -> false
 
-            let is_selected =
-                match state with
-                | GameState.Selected (_, entity) ->
-                    match entity with
-                    | Some selected_id -> fun id -> id = selected_id
-                    | None -> fun _ -> false
-                | _ -> fun _ -> false
+        for entity in container.Query<Eid, Unit, Node, Hexagon>() do
+            let id = entity.Value1
+            let node = entity.Value3
 
-            for entity in c.Query<Eid, Unit, Node, Hexagon>() do
-                let id = entity.Value1
-                let node = entity.Value3
+            let node =
+                GD.InstanceFromId(node.NodeId) :?> UnitNode
 
-                let node =
-                    GD.InstanceFromId(node.NodeId) :?> UnitNode
+            node.Selected <- is_selected id
+    
+    let registerSelectCell (container: Container) =
+        container.On<SelectCell>
+        <| fun _ -> update_selection container
 
-                node.Selected <- is_selected id
-
+    let registerDeselectCell (container: Container) =
+        container.On<DeselectCell>
+        <| fun _ -> update_selection container
+        
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c
-                            registerInput c ]
+                            registerSelectCell c
+                            registerDeselectCell c ]

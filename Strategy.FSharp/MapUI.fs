@@ -2,17 +2,10 @@
 
 open System
 open Godot
+open Garnet.Composition
 open Microsoft.FSharp.Core
 open Strategy.FSharp.Player
-
-type ItemType =
-    | Item
-    | IconItem of icon_path: string
-
-type MenuItem =
-    { label: String
-      command: Unit -> Unit
-      item_type: ItemType }
+open Strategy.FSharp.Systems
 
 type MapUI() =
     inherit MarginContainer()
@@ -71,11 +64,11 @@ type MapUI() =
             items
             |> List.iteri
                 (fun index item ->
-                    match item.item_type with
-                    | IconItem (iconPath) ->
+                    match item.ItemType with
+                    | IconItem iconPath ->
                         let icon = ResourceLoader.Load<Texture2D>(iconPath)
-                        radial_menu.AddIconItem(icon, item.label, index)
-                    | Item -> radial_menu.AddItem(item.label, index))
+                        radial_menu.AddIconItem(icon, item.Label, index)
+                    | Item -> radial_menu.AddItem(item.Label, index))
 
             radial_menu.ResetSize()
 
@@ -86,9 +79,20 @@ type MapUI() =
 
                     if index >= 0 then
                         let item = List.item index items
-                        item.command ()
+                        item.Command()
                     else
                         closed ())
 
             radial_menu.Position <- position
             radial_menu.Popup()
+
+module MapUISystem =
+    let registerShowCellMenu (c: Container) =
+        c.On<ShowCellMenu>
+        <| fun event ->
+            let uiNode = c.LoadResource<uint64>("UINode")
+            let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
+            uiNode.ShowRadialMenu event.Items event.Position event.ClosedHandler
+
+    let register (c: Container) =
+        Disposable.Create [ registerShowCellMenu c ]
