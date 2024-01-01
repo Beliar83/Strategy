@@ -8,6 +8,10 @@ signal selected
 signal deselected
 signal cursor_entered
 signal cursor_exited
+signal highlight_movable
+signal unhighlight_movable
+signal highlight_attackable
+signal unhighlight_attackable
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -31,3 +35,19 @@ func _on_cursor_entered():
 func _on_cursor_exited():
 	$Hexagon/Outline.default_color = Color.BLACK
 	$Hexagon/Outline.z_index = 1
+
+
+func _on_highlight_attackable():
+	$Hexagon/Attackable.visible = true
+
+
+func _on_highlight_movable():
+	$Hexagon/Moveable.visible = true
+
+
+func _on_unhighlight_attackable():
+	$Hexagon/Attackable.visible = false
+
+
+func _on_unhighlight_movable():
+	$Hexagon/Moveable.visible = false

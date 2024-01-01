@@ -21,7 +21,7 @@
 
     <ItemGroup>
         <PackageReference Include="Garnet" Version="0.5.3"/>
-        <PackageReference Include="GodotSharp" Version="4.0.0-beta.3"/>
+        <PackageReference Include="GodotSharp" Version="4.2.1"/>
     </ItemGroup>
 
 </Project>

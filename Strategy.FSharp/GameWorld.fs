@@ -61,8 +61,9 @@ type GameWorld() =
         world.AddResource("MapRadius", 20)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
+        world.AddResource("FieldsNeedUpdate", false)
         world.AddResource("CurrentPlayer", "Player1")
-        world.AddResource("WorldNode", this.GetInstanceId())
+        world.AddResource("WorldNode", this.GetInstanceId())        
         let unitsNode = this.GetNode(new NodePath("Units"))
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
@@ -97,7 +98,7 @@ type GameWorld() =
         MapUISystem.register world |> ignore
 
         update <-
-            world.On<Update>
+            world.On<PhysicsUpdate>
             <| fun _ ->
                 let update_map = world.LoadResource<bool>("UpdateMap")
 
@@ -144,13 +145,12 @@ type GameWorld() =
                   MinAttackRange = 1
                   Armor = 1
                   Mobility = 3
-                  RemainingRange = 0
+                  RemainingRange = 3
                   RemainingAttacks = 0 }
             )
             .With(Hexagon.NewAxial -1 -1)
             .With({ PlayerId = "Player1" })
         |> ignore
-
         world
             .Create()
             .With(
@@ -160,7 +160,23 @@ type GameWorld() =
                   MinAttackRange = 1
                   Armor = 1
                   Mobility = 3
-                  RemainingRange = 0
+                  RemainingRange = 3
+                  RemainingAttacks = 0 }
+            )
+            .With(Hexagon.NewAxial -1 1)
+            .With({ PlayerId = "Player1" })
+        |> ignore
+        
+        world
+            .Create()
+            .With(
+                { Integrity = 10
+                  Damage = 2
+                  MaxAttackRange = 3
+                  MinAttackRange = 1
+                  Armor = 1
+                  Mobility = 3
+                  RemainingRange = 5
                   RemainingAttacks = 0 }
             )
             .With(Hexagon.NewAxial 1 1)
@@ -176,7 +192,7 @@ type GameWorld() =
                   MinAttackRange = 1
                   Armor = 1
                   Mobility = 3
-                  RemainingRange = 0
+                  RemainingRange = 7
                   RemainingAttacks = 0 }
             )
             .With(Hexagon.NewAxial 0 0)
@@ -184,8 +200,11 @@ type GameWorld() =
 
         // First state needs to be set directly
         world.AddResource("State", GameState.NewRound)
+        
+    override this._Process(delta) =
+        world.Run <| { FrameDelta = delta }
 
-    override this._PhysicsProcess(delta) = world.Run <| { UpdateTime = delta }
+    override this._PhysicsProcess(delta) = world.Run <| { PhysicsDelta = delta }
 
     override this._UnhandledInput(event) =
         let handleCursorMouseMotion (event: InputEventMouseMotion) =

@@ -1,7 +1,8 @@
 ﻿module Strategy.FSharp.HexMap
 
-open Garnet.Composition.Join
+open System.Collections.Generic
 open Godot
+open Microsoft.FSharp.Collections
 open Microsoft.FSharp.Core
 open Strategy.FSharp.Hexagon
 open Garnet.Composition
@@ -33,10 +34,6 @@ let HexagonPoints cellSize =
 
 type HexMap() =
     inherit Node2D()
-    let mutable cursorCell = None
-
-    member this.CursorCell: Option<Hexagon> = cursorCell
-
     member this.UpdateCells(container: Container) =
         while this.GetChildCount() > 0 do
             let node = this.GetChildOrNull<Node> 0
@@ -44,8 +41,6 @@ type HexMap() =
             if not <| isNull node then
                 node.QueueFree()
                 this.RemoveChild node
-
-        cursorCell <- None
 
         let hexagon =
             GD.Load("res://Hexagon.tscn") :?> PackedScene
@@ -89,7 +84,7 @@ type UpdateSelectedCell = {Cell: Hexagon}
 let GetCellAtPosition(position: Vector2) = Hexagon.At2DPosition position
 
 let emitCellSignal signal cell (cellNodes : Map<Hexagon, uint64>) =
-    let node = (GD.InstanceFromId cellNodes[cell])
+    let node = (GodotObject.InstanceFromId cellNodes[cell])
     node.EmitSignal signal
 
 let emitCellSelected =
@@ -103,6 +98,14 @@ let emitCursorEnteredCell =
 
 let emitCursorExitedCell =
     emitCellSignal (new StringName "cursor_exited")
+let emitHighlightMovable =
+    emitCellSignal (new StringName "highlight_movable")
+let emitUnhighlightMovable =
+    emitCellSignal (new StringName "unhighlight_movable")
+let emitHighlightAttackable =
+    emitCellSignal (new StringName "highlight_attackable")
+let emitUnhighlightAttackable =
+    emitCellSignal (new StringName "unhighlight_attackable")
 
 let UpdateCursorCell(cell: Hexagon) (c: Container) =
         let cursorCell = c.LoadResource<Option<Hexagon>>("CursorCell")
@@ -126,19 +129,84 @@ let UpdateCursorCell(cell: Hexagon) (c: Container) =
             else
                 c.AddResource("CursorCell", Option<Hexagon>.None)
 
+let getEntitiesAtHexagon(cell: Hexagon, container : Container) =
+    let position = cell.Get2DPosition
+    container.Query<Eid, Hexagon>()
+    |> Seq.filter (fun query -> query.Value2 = cell)
+    |> Seq.map (_.Value1)
+    |> Array.ofSeq
+    
+
+let resetCells (c: Container) =
+    let cell_nodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+    for cell in cell_nodes.Keys do
+        emitCellSignal "unhighlight_movable" cell cell_nodes |> ignore
+        emitCellSignal "unhighlight_attackable" cell cell_nodes |> ignore
+
+let getNeighbours(hexagon: Hexagon) =
+    [|hexagon.GetNeighbour(Direction.East);
+      hexagon.GetNeighbour(Direction.NorthEast);
+      hexagon.GetNeighbour(Direction.NorthWest);
+      hexagon.GetNeighbour(Direction.West);
+      hexagon.GetNeighbour(Direction.SouthWest);
+      hexagon.GetNeighbour(Direction.SouthEast);
+      |]
+
+let findPath(start : Hexagon, target : Hexagon, container: Container) =
+    if getEntitiesAtHexagon(target, container)
+        |> Seq.exists(fun eid ->
+            let entity = container.Get(eid)
+            entity.Has<Unit>()
+            )
+        then List.Empty
+    else
+        let mutable frontier = PriorityQueue<int, Hexagon>();
+        frontier.Enqueue(0, start)
+        let mutable cameFrom = Dictionary<Hexagon, Option<Hexagon>>()
+        let mutable costSoFar = Dictionary<Hexagon, int>()
+        cameFrom[start] <- None
+        costSoFar[start] <- 0
+        while frontier.Count > 0 do
+            let current = frontier.Dequeue()
+            if current = target then frontier.Clear()
+            else
+                let neighbours = getNeighbours(current)
+                for neighbour in neighbours do
+                    if getEntitiesAtHexagon(neighbour, container)
+                        |> Seq.exists(fun eid ->
+                        let entity = container.Get(eid)
+                        entity.Has<Unit>()
+                        ) then ()
+                    else
+                        let newCost = costSoFar[current] + 1
+                        if not <| costSoFar.ContainsKey(neighbour) || newCost < costSoFar[neighbour] then
+                            costSoFar[neighbour] <- newCost
+                            let priority = newCost + neighbour.DistanceTo(target)
+                            frontier.Enqueue(priority, neighbour)
+                            cameFrom[neighbour] <- Some(current)
+        
+        let mutable path = List.Empty
+        if cameFrom[target].IsSome then
+            let mutable current = cameFrom[target].Value            
+            path <- path |> List.insertAt 0 target
+            while not <| (current = start) do
+                path <- path |> List.insertAt 0 current
+                current <- cameFrom[current].Value
+        path
+
 module HexMapSystem =
     let registerUpdatePosition (c: Container) =
-        c.On<Update>
+        c.On<PhysicsUpdate>
         <| fun _ ->
             for entity in c.Query<Eid, Hexagon>() do
                 let entityId = entity.Value1
                 let hexagon = entity.Value2
                 let entity = c.Get entityId
                 let position = hexagon.Get2DPosition
-                entity.Add { X = position.x; Y = position.y }
-
-    let registerUpdateSelected (c: Container) =
-        c.On<Update>
+                entity.Add { X = position.X; Y = position.Y }    
+    
+    let registerUpdateMap (c: Container) =
+        c.On<FrameUpdate>
         <| fun _ ->
 
             let mousePosition = c.LoadResource<Vector2> "CursorPosition"
@@ -146,6 +214,28 @@ module HexMapSystem =
             let cell = GetCellAtPosition mousePosition
 
             c.Send <| { CursorCell = cell }
+            
+            let fields_need_update = c.LoadResource<bool> "FieldsNeedUpdate"
+            
+            if fields_need_update then
+                let state = c.LoadResource<GameState> "State"
+                match state with
+                | Startup | NewRound | Waiting -> resetCells c
+                | Selected(hexagon, eidOption) ->
+                    resetCells c
+                    match eidOption with
+                    | None -> ()
+                    | Some eid ->
+                        let entity = c.Get eid
+                        let unit = entity.Get<Unit>()
+                        let cell_nodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+                        let cells = c.LoadResource<array<Hexagon>> "Cells"
+                        for cell in cells |> Seq.filter (fun cell -> cell.DistanceTo(hexagon) <= unit.RemainingRange) do
+                            let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
+                            if can_move then
+                                emitHighlightMovable cell cell_nodes |> ignore
+                
+                c.AddResource("FieldsNeedUpdate", false)
 
     let registerCursorEntered (c: Container) =
         c.On<CursorMoved>
@@ -172,7 +262,7 @@ module HexMapSystem =
                     c.Send { SelectedCell = cell }
                 let entity_command entity_id =
                     ChangeState (GameState.Selected(cell, Some(entity_id))) c
-
+                    c.AddResource("FieldsNeedUpdate", true)
                     selectCell cell
 
                 let getItemForUnit (entity: Entity) (_unit: Unit) =
@@ -190,7 +280,7 @@ module HexMapSystem =
                 let position = cell.Get2DPosition
 
                 let camera = c.LoadResource<uint64> "Camera"
-                let camera = GD.InstanceFromId camera :?> Camera2D
+                let camera = GodotObject.InstanceFromId camera :?> Camera2D
                 let rect = camera.GetViewportRect()
                 let half_size = rect.Size / 2f
                 let position = position + half_size
@@ -215,7 +305,7 @@ module HexMapSystem =
                              Command = close
                              ItemType = ItemType.Item } |]
 
-                c.Run {Items = Array.toList items; Position = Vector2i.op_Explicit position; ClosedHandler = close}
+                c.Run {Items = Array.toList items; Position = Vector2I.op_Explicit position; ClosedHandler = close}
 
             match state with
             | GameState.Startup -> ()
@@ -223,9 +313,9 @@ module HexMapSystem =
             | GameState.Selected _
             | GameState.Waiting ->
                 let cursorCell = c.LoadResource<Option<Hexagon>>("CursorCell")
-
                 match cursorCell with
-                | Some cursorCell -> showContextMenuForCell cursorCell
+                | Some cursorCell ->
+                    showContextMenuForCell cursorCell
                 | None -> ()
             // TODO: Attacking, Moving
 
@@ -247,7 +337,7 @@ module HexMapSystem =
         <| fun event ->
             let cellNodes = container.LoadResource<Map<Hexagon, uint64>>("CellNodes")
             if cellNodes.ContainsKey(event.SelectedCell) then
-                emitCellSelected event.SelectedCell cellNodes |> ignore
+                emitCellSelected event.SelectedCell cellNodes |> ignore                
     
     let registerCellDeselected (container: Container) =
         container.On<DeselectCell>
@@ -260,12 +350,12 @@ module HexMapSystem =
         container.On<CellsUpdated>
         <| fun _ ->
             let hexMap = container.LoadResource<uint64>("CellsNode")
-            let hexMap = GD.InstanceFromId(hexMap) :?> HexMap
+            let hexMap = GodotObject.InstanceFromId hexMap :?> HexMap
             hexMap.UpdateCells container
     
     let register (c: Container) =
         Disposable.Create [ registerUpdatePosition c
-                            registerUpdateSelected c
+                            registerUpdateMap c
                             registerCursorEntered c
                             registerSelectPressed c
                             registerCellSelected c

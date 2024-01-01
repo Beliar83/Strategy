@@ -1,9 +1,9 @@
 [gd_scene load_steps=2 format=3 uid="uid://xspls1ya1gif"]
 
-[ext_resource type="Script" path="res://Hexagon.gd" id="1"]
+[ext_resource type="Script" path="res://Hexagon.gd" id="1_df6bx"]
 
 [node name="Cell" type="Node2D"]
-script = ExtResource("1")
+script = ExtResource("1_df6bx")
 
 [node name="Hexagon" type="Node2D" parent="."]
 scale = Vector2(4, 4)
@@ -34,4 +34,8 @@ polygon = PackedVector2Array(-8.66025, -5, 0, -10, 8.66025, -5, 8.66025, 5, 0, 1
 [connection signal="cursor_entered" from="." to="." method="_on_cursor_entered"]
 [connection signal="cursor_exited" from="." to="." method="_on_cursor_exited"]
 [connection signal="deselected" from="." to="." method="_on_deselected"]
+[connection signal="highlight_attackable" from="." to="." method="_on_highlight_attackable"]
+[connection signal="highlight_movable" from="." to="." method="_on_highlight_movable"]
 [connection signal="selected" from="." to="." method="_on_selected"]
+[connection signal="unhighlight_attackable" from="." to="." method="_on_unhighlight_attackable"]
+[connection signal="unhighlight_movable" from="." to="." method="_on_unhighlight_movable"]

@@ -6,7 +6,10 @@ open Garnet.Composition
 open Strategy.FSharp.Hexagon
 
 [<Struct>]
-type Update = { UpdateTime: float }
+type PhysicsUpdate = { PhysicsDelta: float }
+
+[<Struct>]
+type FrameUpdate = { FrameDelta : float }
 
 [<Struct>]
 type Position = { X: float32; Y: float32 }
@@ -35,7 +38,7 @@ type MenuItem =
 [<Struct>]
 type ShowCellMenu =
     { Items: List<MenuItem>
-      Position: Vector2i
+      Position: Vector2I
       ClosedHandler: Unit -> Unit }
 
 let ChangeState new_state (container: Container) =

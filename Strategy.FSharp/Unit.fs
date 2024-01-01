@@ -18,6 +18,8 @@ type Unit =
       RemainingRange: int32
       RemainingAttacks: int32 }
 
+let IsInMovementRange(unit : Unit, distance: int) =
+    (distance > 0 && unit.RemainingRange >= distance)
 
 type UnitNode() =
     inherit Node2D()
@@ -57,10 +59,10 @@ type UnitNode() =
 module UnitSystem =
 
     let registerUpdateUnitNodes (c: Container) =
-        c.On<Update>
+        c.On<PhysicsUpdate>
         <| fun _ ->
             let unitsNode = c.LoadResource<uint64>("UnitsNode")
-            let unitsNode = GD.InstanceFromId(unitsNode) :?> Node2D
+            let unitsNode = GodotObject.InstanceFromId(unitsNode) :?> Node2D
 
             for entity in c.Query<Eid, Unit, Hexagon>() do
                 let id = entity.Value1
@@ -84,7 +86,7 @@ module UnitSystem =
                 let node = entity.Value3
 
                 let node =
-                    GD.InstanceFromId(node.NodeId) :?> UnitNode
+                    GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
                 let cell = entity.Value4
 
@@ -120,7 +122,7 @@ module UnitSystem =
             let node = entity.Value3
 
             let node =
-                GD.InstanceFromId(node.NodeId) :?> UnitNode
+                GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
             node.Selected <- is_selected id
     

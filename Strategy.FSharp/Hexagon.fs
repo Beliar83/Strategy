@@ -49,10 +49,10 @@ type Hexagon =
 
     static member At2DPosition(pos: Vector2) =
         let q =
-            ((sqrt <| 3f) / 3f * pos.x - 1f / 3f * pos.y)
+            ((sqrt <| 3f) / 3f * pos.X - 1f / 3f * pos.Y)
             / CELL_SIZE
 
-        let r = (2f / 3f * pos.y) / CELL_SIZE
+        let r = (2f / 3f * pos.Y) / CELL_SIZE
         let s = -q - r
         let q, r, s = CubeRound q r s
         Hexagon.NewCube q r s
@@ -69,8 +69,8 @@ type Hexagon =
 
     // Create from Vector2 representation for easy passing to and from Godot
     static member FromVector2(vector: Vector2) =
-        let q = int32 vector.x
-        let r = int32 vector.y
+        let q = int32 vector.X
+        let r = int32 vector.Y
         Hexagon.NewAxial q r
 
     // Represent as Vector2 for easy passing to and from Godot
@@ -102,7 +102,8 @@ type Hexagon =
         | Direction.East -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
         | Direction.NorthEast -> Hexagon.NewCube(self.Q + 1) (self.R - 1) self.S
         | Direction.NorthWest -> Hexagon.NewCube self.Q (self.R - 1) (self.S + 1)
-        | Direction.West -> Hexagon.NewCube(self.Q + 1) self.R (self.S - 1)
+        | Direction.West -> Hexagon.NewCube(self.Q - 1) self.R (self.S + 1)
         | Direction.SouthWest -> Hexagon.NewCube(self.Q - 1) (self.R + 1) self.S
         | Direction.SouthEast -> Hexagon.NewCube self.Q (self.R + 1) (self.S - 1)
         | _ -> raise (ArgumentOutOfRangeException("direction"))
+

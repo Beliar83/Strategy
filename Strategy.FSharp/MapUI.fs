@@ -53,7 +53,7 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2i) (closed: Unit -> Unit) =
+    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2I) (closed: Unit -> Unit) =
         match radial_menu with
         | None -> GD.PrintErr("MapUI: RadialMenu is not set")
         | Some radial_menu ->
@@ -72,16 +72,15 @@ type MapUI() =
 
             radial_menu.ResetSize()
 
-            radial_menu
-                .ToSignal(radial_menu, "popup_hide")
-                .OnCompleted(fun () ->
-                    let index = radial_menu.GetFocusedItem()
-
-                    if index >= 0 then
-                        let item = List.item index items
-                        item.Command()
-                    else
-                        closed ())
+            let event = radial_menu.ToSignal(radial_menu, "id_pressed");
+            event.OnCompleted(fun () ->
+                let result = event.GetResult()
+                let index = result[0].AsInt32()                
+                if index >= 0 then
+                    let item = List.item index items
+                    item.Command()
+                else
+                    closed ())
 
             radial_menu.Position <- position
             radial_menu.Popup()
@@ -91,7 +90,7 @@ module MapUISystem =
         c.On<ShowCellMenu>
         <| fun event ->
             let uiNode = c.LoadResource<uint64>("UINode")
-            let uiNode = GD.InstanceFromId(uiNode) :?> MapUI
+            let uiNode = GodotObject.InstanceFromId(uiNode) :?> MapUI
             uiNode.ShowRadialMenu event.Items event.Position event.ClosedHandler
 
     let register (c: Container) =

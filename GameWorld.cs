@@ -11,6 +11,12 @@ namespace Strategy
         }
 
         /// <inheritdoc />
+        public override void _Process(double delta)
+        {
+            base._Process(delta);
+        }
+
+        /// <inheritdoc />
         public override void _PhysicsProcess(double delta)
         {
             base._PhysicsProcess(delta);
