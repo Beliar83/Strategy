@@ -233,22 +233,24 @@ module HexMapSystem =
                     | Some eid ->
                         let entity = c.Get eid
                         let unit = entity.Get<Unit>()
-                        let player = entity.Get<Player.Player>()
+                        let selectedCellPlayer = entity.Get<Player.Player>()
                         let unitNode = GodotObject.InstanceFromId(entity.Get<Node>().NodeId) :?> Node2D
                         let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
                         let cells = c.LoadResource<array<Hexagon>> "Cells"
+                        let currentPlayer = c.LoadResource<string>("CurrentPlayer")
                         let isSamePlayer (entity : Entity<int,Eid,EidSegmentKeyMapper>) =
                             if entity.Has<Player.Player>() then
                                 let entityPlayer = entity.Get<Player.Player>()                            
-                                player.PlayerId = entityPlayer.PlayerId
+                                selectedCellPlayer.PlayerId = entityPlayer.PlayerId
                             else
                                 false
                         for cell in cells do
                             let distanceToUnit = cell.DistanceTo(hexagon)
-                            if distanceToUnit <= unit.RemainingRange then
-                                let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
-                                if can_move then
-                                    emitHighlightMovable cell cellNodes |> ignore
+                            if selectedCellPlayer.PlayerId = currentPlayer then
+                                if distanceToUnit <= unit.RemainingRange then
+                                    let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
+                                    if can_move then
+                                        emitHighlightMovable cell cellNodes |> ignore
                             if distanceToUnit >= unit.MinAttackRange && distanceToUnit <= unit.MaxAttackRange then
                                 let entitiesAtTarget = getEntitiesAtHexagon(cell, c)
                                 let isTargetSamePlayer =
