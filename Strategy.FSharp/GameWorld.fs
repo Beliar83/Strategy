@@ -196,6 +196,7 @@ type GameWorld() =
                   RemainingAttacks = 0 }
             )
             .With(Hexagon.NewAxial 0 0)
+            .With({ PlayerId = "Player2" })
         |> ignore
 
         // First state needs to be set directly

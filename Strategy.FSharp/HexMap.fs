@@ -7,6 +7,8 @@ open Microsoft.FSharp.Core
 open Strategy.FSharp.Hexagon
 open Garnet.Composition
 open Strategy.FSharp.Input
+open Strategy.FSharp.Nodes
+open Strategy.FSharp.Player
 open Strategy.FSharp.Systems
 open Strategy.FSharp.Unit
 
@@ -16,6 +18,9 @@ let PolygonHeight cellSize = 2f * cellSize
 
 let Half value = value / 2f
 let Quarter value = value / 4f
+
+let GROUND_BIT = 0
+let UNIT_BIT = 1;
 
 let HexagonPoints cellSize =
     let width = PolygonWidth cellSize
@@ -36,7 +41,7 @@ type HexMap() =
     inherit Node2D()
     member this.UpdateCells(container: Container) =
         while this.GetChildCount() > 0 do
-            let node = this.GetChildOrNull<Node> 0
+            let node = this.GetChildOrNull<Godot.Node> 0
 
             if not <| isNull node then
                 node.QueueFree()
@@ -228,13 +233,53 @@ module HexMapSystem =
                     | Some eid ->
                         let entity = c.Get eid
                         let unit = entity.Get<Unit>()
-                        let cell_nodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+                        let player = entity.Get<Player.Player>()
+                        let unitNode = GodotObject.InstanceFromId(entity.Get<Node>().NodeId) :?> Node2D
+                        let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
                         let cells = c.LoadResource<array<Hexagon>> "Cells"
-                        for cell in cells |> Seq.filter (fun cell -> cell.DistanceTo(hexagon) <= unit.RemainingRange) do
-                            let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
-                            if can_move then
-                                emitHighlightMovable cell cell_nodes |> ignore
-                
+                        let isSamePlayer (entity : Entity<int,Eid,EidSegmentKeyMapper>) =
+                            if entity.Has<Player.Player>() then
+                                let entityPlayer = entity.Get<Player.Player>()                            
+                                player.PlayerId = entityPlayer.PlayerId
+                            else
+                                false
+                        for cell in cells do
+                            let distanceToUnit = cell.DistanceTo(hexagon)
+                            if distanceToUnit <= unit.RemainingRange then
+                                let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
+                                if can_move then
+                                    emitHighlightMovable cell cellNodes |> ignore
+                            if distanceToUnit >= unit.MinAttackRange && distanceToUnit <= unit.MaxAttackRange then
+                                let entitiesAtTarget = getEntitiesAtHexagon(cell, c)
+                                let isTargetSamePlayer =
+                                    entitiesAtTarget
+                                    |> Array.exists (fun eid ->                                    
+                                            let entity = c.Get(eid)
+                                            if entity.Has<Unit>() then
+                                                isSamePlayer(entity)
+                                            else
+                                                false
+                                        )
+                                if not <| isTargetSamePlayer then
+                                    let selfPosition = hexagon.Get2DPosition
+                                    let cellPosition = cell.Get2DPosition
+                                    let mapSize = c.LoadResource<int>("MapRadius")
+                                    
+                                    let adjustmentVector = Vector2((mapSize |> float32) / 8.0f, (mapSize |> float32 ) / 8.0f)
+                                    let queryParameters = new PhysicsRayQueryParameters2D()
+                                    queryParameters.From <- selfPosition + adjustmentVector
+                                    queryParameters.To <- cellPosition
+                                    queryParameters.CollisionMask <- 1u <<< UNIT_BIT
+                                    queryParameters.CollideWithAreas <- true
+                                    queryParameters.HitFromInside <- false
+                                    let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
+                                    if result.Count = 0 then
+                                        emitHighlightAttackable cell cellNodes |> ignore
+                                    else
+                                        queryParameters.From <- selfPosition - adjustmentVector
+                                        let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
+                                        if (result.Count = 0) then
+                                            emitHighlightAttackable cell cellNodes |> ignore
                 c.AddResource("FieldsNeedUpdate", false)
 
     let registerCursorEntered (c: Container) =
