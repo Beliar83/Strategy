@@ -249,3 +249,41 @@ type GameWorld() =
         | Waiting -> handleWaiting event
         | Selected (cell, entity) -> handleSelected event cell entity
         | _ -> ()
+    
+    override this._Draw() =
+        let state = world.LoadResource<GameState>("State")
+        match state with
+        | Startup
+        | NewRound
+        | Waiting -> ()
+        | Selected(hexagon, _) ->
+            let unitEntity =
+                getEntitiesAtHexagon(hexagon, world)
+                |> Array.map world.Get
+                |> Array.choose (fun entity ->
+                    if entity.Has<Unit>() && entity.Has<Player>() then
+                        Some(entity)
+                    else
+                        None
+                    )
+                |> Array.tryHead
+            match unitEntity with
+            | None -> ()
+            | Some unitEntity ->
+                let currentPlayer = world.LoadResource<string>("CurrentPlayer")
+                let unitPlayer = unitEntity.Get<Player>()
+                if unitPlayer.PlayerId = currentPlayer then
+                    let unit = unitEntity.Get<Unit>()
+                    let cell = world.LoadResource<Option<Hexagon>>("CursorCell")
+                    match cell with
+                    | None -> ()
+                    | Some cell ->
+                        let path = findPath (hexagon, cell, world)
+                        if path.Length <= unit.RemainingRange then
+                            let mutable currentCell = hexagon
+                            if path.Length > 0 then
+                                for cell in path do
+                                    let fromPosition = currentCell.Get2DPosition
+                                    let toPosition = cell.Get2DPosition
+                                    this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
+                                    currentCell <- cell

@@ -28,6 +28,12 @@ namespace Strategy
             base._UnhandledInput(@event);
         }
 
+        /// <inheritdoc />
+        public override void _Draw()
+        {
+            base._Draw();
+        }
+
         [Export((PropertyHint)35, "MarginContainer")]
         public new NodePath MapUI
         {

@@ -133,6 +133,9 @@ let UpdateCursorCell(cell: Hexagon) (c: Container) =
                 emitCursorEnteredCell cell cellNodes |> ignore
             else
                 c.AddResource("CursorCell", Option<Hexagon>.None)
+            
+            let worldNode = GodotObject.InstanceFromId(c.LoadResource<uint64>("WorldNode")) :?> Node2D            
+            worldNode.QueueRedraw()
 
 let getEntitiesAtHexagon(cell: Hexagon, container : Container) =
     let position = cell.Get2DPosition
