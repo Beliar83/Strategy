@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open Godot
 open Garnet.Composition
+open Microsoft.FSharp.Collections
 open Strategy.FSharp.Hexagon
 open Strategy.FSharp.HexMap
 open Strategy.FSharp.MapUI
@@ -42,7 +43,8 @@ let CreateGrid radius =
 type GameWorld() =
     inherit Node2D()
     let world = Container()
-    let mutable update = Unchecked.defaultof<_>
+    let mutable physicsUpdate = Unchecked.defaultof<_>
+    let mutable frameUpdate = Unchecked.defaultof<_>
     let playerQueue = Queue<string>()
 
     let mutable mapUI: NodePath = null
@@ -58,7 +60,7 @@ type GameWorld() =
         and set value = camera <- value
 
     override this._Ready() =
-        world.AddResource("MapRadius", 20)
+        world.AddResource("MapRadius", 5)
         world.AddResource("UpdateMap", true)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("FieldsNeedUpdate", false)
@@ -97,7 +99,14 @@ type GameWorld() =
         HexMapSystem.register world |> ignore
         MapUISystem.register world |> ignore
 
-        update <-
+        frameUpdate <-
+            world.On<FrameUpdate>
+            <| fun _ ->
+                for entity in world.Query<Position, Node>() do
+                    let node = GodotObject.InstanceFromId(entity.Value2.NodeId) :?> Node2D
+                    node.Position <- Vector2(entity.Value1.X, entity.Value1.Y)
+        
+        physicsUpdate <-
             world.On<PhysicsUpdate>
             <| fun _ ->
                 let update_map = world.LoadResource<bool>("UpdateMap")
@@ -134,7 +143,20 @@ type GameWorld() =
                     let next_player = playerQueue.Dequeue()
                     world.AddResource("CurrentPlayer", next_player)
                     ChangeState Waiting world
+                | Moving(eid, path) ->
+                    if path.Length > 0 then
+                        let entity = world.Get(eid)                    
+                        let newCell = path.Head
+                        let unit = entity.Get<Unit>()
+                        entity.Set(newCell)
+                        entity.Set({unit with RemainingRange = unit.RemainingRange - 1 })
+                        ChangeState (Moving(eid, path.Tail)) world
+                    else
+                        ChangeState Waiting world
+                        world.AddResource("FieldsNeedUpdate", true)
                 | _ -> ()
+                
+                
 
         world
             .Create()

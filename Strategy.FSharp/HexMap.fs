@@ -204,7 +204,7 @@ let findPath(start : Hexagon, target : Hexagon, container: Container) =
 
 module HexMapSystem =
     let registerUpdatePosition (c: Container) =
-        c.On<PhysicsUpdate>
+        c.On<FrameUpdate>
         <| fun _ ->
             for entity in c.Query<Eid, Hexagon>() do
                 let entityId = entity.Value1
@@ -227,10 +227,9 @@ module HexMapSystem =
             
             if fields_need_update then
                 let state = c.LoadResource<GameState> "State"
+                resetCells c
                 match state with
-                | Startup | NewRound | Waiting -> resetCells c
                 | Selected(hexagon, eidOption) ->
-                    resetCells c
                     match eidOption with
                     | None -> ()
                     | Some eid ->
@@ -285,6 +284,8 @@ module HexMapSystem =
                                         let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
                                         if (result.Count = 0) then
                                             emitHighlightAttackable cell cellNodes |> ignore
+                | _ -> ()
+
                 c.AddResource("FieldsNeedUpdate", false)
 
     let registerCursorEntered (c: Container) =
@@ -310,23 +311,62 @@ module HexMapSystem =
 
                 let selectCell (cell: Hexagon) =
                     c.Send { SelectedCell = cell }
-                let entity_command entity_id =
-                    ChangeState (GameState.Selected(cell, Some(entity_id))) c
+                let entityCommand entityId =
+                    ChangeState (GameState.Selected(cell, Some(entityId))) c
                     c.AddResource("FieldsNeedUpdate", true)
                     selectCell cell
 
+                let moveCommand(entityId, path) =
+                    ChangeState (GameState.Moving(entityId, path)) c
+                
                 let getItemForUnit (entity: Entity) (_unit: Unit) =
                     { Label = "Unit"
-                      Command = (fun () -> entity_command entity.Id)
+                      Command = (fun () -> entityCommand entity.Id)
                       ItemType = ItemType.IconItem("res://assets/units/tank.png") }
-
-                let items =
+                
+                let entitiesWithUnit =
                     entities
                     |> Array.filter (fun entity -> entity.Has<Unit>())
+ 
+                
+                let items =
+                    entitiesWithUnit
                     |> Array.map (fun entity -> getItemForUnit entity (entity.Get<Unit>()))
                     |> Array.append items
 
-
+                let items =
+                    Array.append
+                        items
+                        [|
+                            let currentUnitEntity =
+                                match state with
+                                | Startup
+                                | NewRound
+                                | Waiting -> None
+                                | Selected(_, eidOption) ->
+                                    match eidOption with
+                                    | None -> None
+                                    | Some eid ->
+                                        let entity = c.Get(eid)
+                                        if entity.Has<Unit>() && entity.Has<Hexagon>() then
+                                            Some(entity)
+                                        else
+                                            None
+                                | Moving _ -> None
+                            match currentUnitEntity with
+                            | None -> ()
+                            | Some entity ->
+                                let unit = entity.Get<Unit>()
+                                let unitCell = entity.Get<Hexagon>()
+                                let path = findPath(unitCell, cell, c)
+                                if IsInMovementRange(unit, path.Length) then
+                                    { Label = "Move"; Command = (fun () -> moveCommand(entity.Id, path)); ItemType = ItemType.IconItem("res://assets/icons/move.png") }
+                                else
+                                    ()                            
+                        |]
+                
+                //IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
+                
                 let position = cell.Get2DPosition
 
                 let camera = c.LoadResource<uint64> "Camera"
@@ -367,6 +407,7 @@ module HexMapSystem =
                 | Some cursorCell ->
                     showContextMenuForCell cursorCell
                 | None -> ()
+            | Moving _ -> ()
             // TODO: Attacking, Moving
 
         let handleCancel () =

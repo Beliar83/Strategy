@@ -19,6 +19,7 @@ type GameState =
     | NewRound
     | Waiting
     | Selected of Hexagon * Option<Eid>
+    | Moving of Eid * list<Hexagon>
 
 [<Struct>]
 type SelectCell = { SelectedCell: Hexagon }
@@ -53,10 +54,32 @@ let ChangeState new_state (container: Container) =
             | _ -> state
         | Waiting ->
             match new_state with
-            | _ -> new_state
+            | Startup
+            | NewRound
+            | Waiting -> new_state
+            | Selected _ -> new_state
+            | Moving _ -> state
         | Selected (cell, _) ->
-            container.Send { DeselectedCell = cell }
-            new_state
-        | NewRound -> new_state
+            match new_state with
+            | Waiting ->
+                container.Send { DeselectedCell = cell }
+                new_state
+            | Moving _ ->
+                container.Send { DeselectedCell = cell }
+                new_state
+            | Selected _ ->
+                container.Send { DeselectedCell = cell }
+                new_state
+            | _ -> state
+        | NewRound ->
+            match new_state with
+            | Waiting -> new_state
+            | _ -> state
+        | Moving(currentEid, currentPath) ->
+            match new_state with
+            | Waiting -> if (currentPath.Length <= 0) then new_state else state
+            | Moving(eid, path) -> if (eid = currentEid && path.Length < currentPath.Length) then new_state else state
+            | _ -> state
+        
 
     container.AddResource("State", changed_state)
