@@ -53,7 +53,7 @@ type HexMap() =
 
         let cells = container.LoadResource<Hexagon[]>("Cells")
         
-        let cell_nodes =
+        let cellNodes =
             cells
             |> Array.map (fun cell ->
                 let node = hexagon.Instantiate() :?> Node2D
@@ -61,12 +61,11 @@ type HexMap() =
                 node.Position <- cell.Get2DPosition
                 node.Set("Cell", Vector3(float32 cell.Q, float32 cell.R, float32 cell.S))
                 this.AddChild node
-                this.QueueRedraw()
                 (cell, node.GetInstanceId()) )
         
-        let cell_nodes = Map.ofArray cell_nodes
+        let cellNodes = Map.ofArray cellNodes
         
-        container.AddResource("CellNodes", cell_nodes)
+        container.AddResource("CellNodes", cellNodes)
 
     member this.GetCellAtPosition(position: Vector2) = Hexagon.At2DPosition position
 
@@ -146,10 +145,10 @@ let getEntitiesAtHexagon(cell: Hexagon, container : Container) =
     
 
 let resetCells (c: Container) =
-    let cell_nodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
-    for cell in cell_nodes.Keys do
-        emitCellSignal "unhighlight_movable" cell cell_nodes |> ignore
-        emitCellSignal "unhighlight_attackable" cell cell_nodes |> ignore
+    let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+    for cell in cellNodes.Keys do
+        emitCellSignal "unhighlight_movable" cell cellNodes |> ignore
+        emitCellSignal "unhighlight_attackable" cell cellNodes |> ignore
 
 let getNeighbours(hexagon: Hexagon) =
     [|hexagon.GetNeighbour(Direction.East);
@@ -223,9 +222,9 @@ module HexMapSystem =
 
             c.Send <| { CursorCell = cell }
             
-            let fields_need_update = c.LoadResource<bool> "FieldsNeedUpdate"
+            let fieldsNeedUpdate = c.LoadResource<bool> "FieldsNeedUpdate"
             
-            if fields_need_update then
+            if fieldsNeedUpdate then
                 let state = c.LoadResource<GameState> "State"
                 resetCells c
                 match state with
@@ -250,8 +249,8 @@ module HexMapSystem =
                             let distanceToUnit = cell.DistanceTo(hexagon)
                             if selectedCellPlayer.PlayerId = currentPlayer then
                                 if distanceToUnit <= unit.RemainingRange then
-                                    let can_move = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
-                                    if can_move then
+                                    let canMove = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
+                                    if canMove then
                                         emitHighlightMovable cell cellNodes |> ignore
                             if distanceToUnit >= unit.MinAttackRange && distanceToUnit <= unit.MaxAttackRange then
                                 let entitiesAtTarget = getEntitiesAtHexagon(cell, c)
@@ -372,10 +371,10 @@ module HexMapSystem =
                 let camera = c.LoadResource<uint64> "Camera"
                 let camera = GodotObject.InstanceFromId camera :?> Camera2D
                 let rect = camera.GetViewportRect()
-                let half_size = rect.Size / 2f
-                let position = position + half_size
+                let halfSize = rect.Size / 2f
+                let position = position + halfSize
 
-                let end_turn () =
+                let endTurn () =
                     ChangeState GameState.NewRound c
 
                 let close () =
@@ -385,7 +384,7 @@ module HexMapSystem =
                     Array.append
                         items
                         [| { Label = "End Turn"
-                             Command = end_turn
+                             Command = endTurn
                              ItemType = ItemType.IconItem "res://assets/icons/simpleBlock.png" } |]
 
                 let items =

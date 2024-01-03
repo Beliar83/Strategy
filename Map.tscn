@@ -17,7 +17,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3")
 PlayerLabel = NodePath("Top/PlayerName")
-RadialMenu = NodePath("PopupMenu")
+ContextMenu = NodePath("PopupMenu")
 
 [node name="Top" type="VBoxContainer" parent="UILayer/UI"]
 layout_mode = 2

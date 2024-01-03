@@ -109,9 +109,9 @@ type GameWorld() =
         physicsUpdate <-
             world.On<PhysicsUpdate>
             <| fun _ ->
-                let update_map = world.LoadResource<bool>("UpdateMap")
+                let updateMap = world.LoadResource<bool>("UpdateMap")
 
-                if update_map then
+                if updateMap then
                     let mapRadius = world.LoadResource<int>("MapRadius")
 
                     world.AddResource("Cells", CreateGrid mapRadius)
@@ -140,8 +140,8 @@ type GameWorld() =
                         for player in players do
                             playerQueue.Enqueue(player.Key)
 
-                    let next_player = playerQueue.Dequeue()
-                    world.AddResource("CurrentPlayer", next_player)
+                    let nextPlayer = playerQueue.Dequeue()
+                    world.AddResource("CurrentPlayer", nextPlayer)
                     ChangeState Waiting world
                 | Moving(eid, path) ->
                     if path.Length > 0 then
@@ -309,3 +309,4 @@ type GameWorld() =
                                     let toPosition = cell.Get2DPosition
                                     this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
                                     currentCell <- cell
+        | Moving _ -> ()

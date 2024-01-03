@@ -12,10 +12,10 @@ namespace Strategy
         }
 
         [Export((PropertyHint)35, "Popup")]
-        public new NodePath RadialMenu
+        public new NodePath ContextMenu
         {
-            get => base.RadialMenu;
-            set => base.RadialMenu = value;
+            get => base.ContextMenu;
+            set => base.ContextMenu = value;
         }
     }
 }

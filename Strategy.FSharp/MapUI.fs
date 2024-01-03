@@ -10,56 +10,56 @@ open Strategy.FSharp.Systems
 type MapUI() =
     inherit MarginContainer()
 
-    let mutable player_label: Option<NodePath> = None
-    let mutable radial_menu: Option<NodePath> = None
+    let mutable playerLabel: Option<NodePath> = None
+    let mutable contextMenu: Option<NodePath> = None
 
     member this.PlayerLabel
         with get () =
-            match player_label with
+            match playerLabel with
             | Some path -> path
             | None -> null
         and set value =
             if isNull value then
-                player_label <- None
+                playerLabel <- None
             else
-                player_label <- Some(value)
+                playerLabel <- Some(value)
 
-    member this.RadialMenu
+    member this.ContextMenu
         with get () =
-            match radial_menu with
+            match contextMenu with
             | Some path -> path
             | None -> null
         and set value =
             if isNull value then
-                radial_menu <- None
+                contextMenu <- None
             else
-                radial_menu <- Some(value)
+                contextMenu <- Some(value)
 
 
     member this.SetPlayer(name: String, player: PlayerData) =
-        match player_label with
+        match playerLabel with
         | None -> GD.PrintErr("MapUI: PlayerLabel is not set")
-        | Some player_label ->
-            let playerNameLabel = this.GetNode(player_label) :?> Label
+        | Some playerLabel ->
+            let playerNameLabel = this.GetNode(playerLabel) :?> Label
 
             playerNameLabel.Text <- name
             playerNameLabel.AddThemeColorOverride("font_color", player.Color)
 
     member this.ResetPlayer() =
-        match player_label with
+        match playerLabel with
         | None -> GD.PrintErr("MapUI: PlayerLabel is not set")
-        | Some player_label ->
-            let playerNameLabel = this.GetNode(player_label) :?> Label
+        | Some playerLabel ->
+            let playerNameLabel = this.GetNode(playerLabel) :?> Label
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowRadialMenu (items: List<MenuItem>) (position: Vector2I) (closed: Unit -> Unit) =
-        match radial_menu with
-        | None -> GD.PrintErr("MapUI: RadialMenu is not set")
-        | Some radial_menu ->
+    member this.ShowContextMenu (items: List<MenuItem>) (position: Vector2I) (closed: Unit -> Unit) =
+        match contextMenu with
+        | None -> GD.PrintErr("MapUI: ContextMenu is not set")
+        | Some contextMenu ->
 
-            let radial_menu = this.GetNode(radial_menu) :?> PopupMenu
-            radial_menu.Clear()
+            let contextMenu = this.GetNode(contextMenu) :?> PopupMenu
+            contextMenu.Clear()
 
             items
             |> List.iteri
@@ -67,31 +67,38 @@ type MapUI() =
                     match item.ItemType with
                     | IconItem iconPath ->
                         let icon = ResourceLoader.Load<Texture2D>(iconPath)
-                        radial_menu.AddIconItem(icon, item.Label, index)
-                    | Item -> radial_menu.AddItem(item.Label, index))
+                        contextMenu.AddIconItem(icon, item.Label, index)
+                    | Item -> contextMenu.AddItem(item.Label, index))
 
-            radial_menu.ResetSize()
+            contextMenu.ResetSize()
 
-            let event = radial_menu.ToSignal(radial_menu, "id_pressed");
-            event.OnCompleted(fun () ->
-                let result = event.GetResult()
-                let index = result[0].AsInt32()                
-                if index >= 0 then
-                    let item = List.item index items
-                    item.Command()
-                else
-                    closed ())
+            let event =
+                contextMenu.ToSignal(contextMenu, "id_pressed")
 
-            radial_menu.Position <- position
-            radial_menu.Popup()
+            event.OnCompleted
+                (fun () ->
+                    let result = event.GetResult()
+                    let index = result[0].AsInt32()
+
+                    if index >= 0 then
+                        let item = List.item index items
+                        item.Command()
+                    else
+                        closed ())
+
+            contextMenu.Position <- position
+            contextMenu.Popup()
 
 module MapUISystem =
     let registerShowCellMenu (c: Container) =
         c.On<ShowCellMenu>
         <| fun event ->
             let uiNode = c.LoadResource<uint64>("UINode")
-            let uiNode = GodotObject.InstanceFromId(uiNode) :?> MapUI
-            uiNode.ShowRadialMenu event.Items event.Position event.ClosedHandler
+
+            let uiNode =
+                GodotObject.InstanceFromId(uiNode) :?> MapUI
+
+            uiNode.ShowContextMenu event.Items event.Position event.ClosedHandler
 
     let register (c: Container) =
         Disposable.Create [ registerShowCellMenu c ]

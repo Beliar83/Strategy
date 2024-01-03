@@ -106,14 +106,14 @@ module UnitSystem =
                 else
                     node.Color <- Colors.Gray
 
-    let rec update_selection (container: Container) =
+    let rec updateSelection (container: Container) =
         let state = container.LoadResource<GameState>("State")
 
-        let is_selected =
+        let isSelected =
             match state with
             | GameState.Selected (_, entity) ->
                 match entity with
-                | Some selected_id -> fun id -> id = selected_id
+                | Some selectedId -> fun id -> id = selectedId
                 | None -> fun _ -> false
             | _ -> fun _ -> false
 
@@ -124,15 +124,15 @@ module UnitSystem =
             let node =
                 GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
-            node.Selected <- is_selected id
+            node.Selected <- isSelected id
     
     let registerSelectCell (container: Container) =
         container.On<SelectCell>
-        <| fun _ -> update_selection container
+        <| fun _ -> updateSelection container
 
     let registerDeselectCell (container: Container) =
         container.On<DeselectCell>
-        <| fun _ -> update_selection container
+        <| fun _ -> updateSelection container
         
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c

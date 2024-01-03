@@ -106,4 +106,3 @@ type Hexagon =
         | Direction.SouthWest -> Hexagon.NewCube(self.Q - 1) (self.R + 1) self.S
         | Direction.SouthEast -> Hexagon.NewCube self.Q (self.R + 1) (self.S - 1)
         | _ -> raise (ArgumentOutOfRangeException("direction"))
-

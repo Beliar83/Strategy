@@ -42,44 +42,39 @@ type ShowCellMenu =
       Position: Vector2I
       ClosedHandler: Unit -> Unit }
 
-let ChangeState new_state (container: Container) =
+let ChangeState newState (container: Container) =
     let state =
         container.LoadResource<GameState> "State"
 
-    let changed_state =
+    let changedState =
         match state with
         | Startup ->
-            match new_state with
-            | NewRound -> new_state
+            match newState with
+            | NewRound -> newState
             | _ -> state
         | Waiting ->
-            match new_state with
+            match newState with
             | Startup
             | NewRound
-            | Waiting -> new_state
-            | Selected _ -> new_state
+            | Waiting -> newState
+            | Selected _ -> newState
             | Moving _ -> state
         | Selected (cell, _) ->
-            match new_state with
-            | Waiting ->
+            match newState with
+            | Startup -> state
+            | _ ->
                 container.Send { DeselectedCell = cell }
-                new_state
-            | Moving _ ->
-                container.Send { DeselectedCell = cell }
-                new_state
-            | Selected _ ->
-                container.Send { DeselectedCell = cell }
-                new_state
-            | _ -> state
+                container.AddResource("FieldsNeedUpdate", true)
+                newState
         | NewRound ->
-            match new_state with
-            | Waiting -> new_state
+            match newState with
+            | Waiting -> newState
             | _ -> state
         | Moving(currentEid, currentPath) ->
-            match new_state with
-            | Waiting -> if (currentPath.Length <= 0) then new_state else state
-            | Moving(eid, path) -> if (eid = currentEid && path.Length < currentPath.Length) then new_state else state
+            match newState with
+            | Waiting -> if (currentPath.Length <= 0) then newState else state
+            | Moving(eid, path) -> if (eid = currentEid && path.Length < currentPath.Length) then newState else state
             | _ -> state
         
 
-    container.AddResource("State", changed_state)
+    container.AddResource("State", changedState)
