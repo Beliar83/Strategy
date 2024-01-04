@@ -1,6 +1,5 @@
 ﻿module Strategy.FSharp.Unit
 
-open System
 open Godot
 open Garnet.Composition
 open Strategy.FSharp.Hexagon
@@ -50,11 +49,13 @@ type UnitNode() =
             outline.Visible <- value
             selected <- value
 
-    member this.Color
-        with get () =
-            (this.GetNode(new NodePath("Model")) :?> CanvasItem)
-                .Modulate
-        and set value = (this.GetNode(new NodePath("Model")) :?> CanvasItem).Modulate <- value
+    member this.SetColor(color : Color) =
+        let body = this.GetNode(new NodePath("Body")) :?> CanvasItem
+        let material = body.Material :?> ShaderMaterial
+        material.SetShaderParameter("color", GodotColorFromColor(color))
+        let weapon = body.GetNode(new NodePath("Weapon")) :?> CanvasItem
+        let material = weapon.Material :?> ShaderMaterial
+        material.SetShaderParameter("color", GodotColorFromColor(color))
 
 module UnitSystem =
 
@@ -63,7 +64,7 @@ module UnitSystem =
         <| fun _ ->
             let unitsNode = c.LoadResource<uint64>("UnitsNode")
             let unitsNode = GodotObject.InstanceFromId(unitsNode) :?> Node2D
-
+            let players = c.LoadResource<Map<string,PlayerData>>("Players")
             for entity in c.Query<Eid, Unit, Hexagon>() do
                 let id = entity.Value1
                 let cell = entity.Value3
@@ -77,6 +78,10 @@ module UnitSystem =
                     let node = node.Instantiate() :?> UnitNode
                     entity.Add { NodeId = node.GetInstanceId() }
                     node.Position <- cell.Get2DPosition
+                    if entity.Has<Player>() then
+                        let player = entity.Get<Player>()
+                        node.SetColor(players[player.PlayerId].Color)
+                    
                     unitsNode.AddChild node
                     entity.Add { NodeId = node.GetInstanceId() }
 
@@ -92,19 +97,6 @@ module UnitSystem =
 
                 node.Integrity <- unit.Integrity
                 node.Cell <- cell
-
-                let entity = c.Get id
-
-                if entity.Has<Player>() then
-                    let player = entity.Get<Player>()
-
-                    let players =
-                        c.LoadResource<Map<String, PlayerData>> "Players"
-
-                    if players.ContainsKey(player.PlayerId) then
-                        node.Color <- players[player.PlayerId].Color
-                else
-                    node.Color <- Colors.Gray
 
     let rec updateSelection (container: Container) =
         let state = container.LoadResource<GameState>("State")

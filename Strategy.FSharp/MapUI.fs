@@ -43,7 +43,7 @@ type MapUI() =
             let playerNameLabel = this.GetNode(playerLabel) :?> Label
 
             playerNameLabel.Text <- name
-            playerNameLabel.AddThemeColorOverride("font_color", player.Color)
+            playerNameLabel.AddThemeColorOverride("font_color", GodotColorFromColor(player.Color))
 
     member this.ResetPlayer() =
         match playerLabel with

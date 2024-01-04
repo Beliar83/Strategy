@@ -1,24 +1,37 @@
-[gd_scene load_steps=5 format=3 uid="uid://clwsaaubhp7fa"]
+[gd_scene load_steps=11 format=3 uid="uid://cjiwmaboqhwen"]
 
 [ext_resource type="Script" path="res://Unit.cs" id="1"]
-[ext_resource type="Texture2D" uid="uid://bk6kdil0tj0xg" path="res://assets/units/tank.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://bvftq2m403qix" path="res://assets/units/Hull_01_NoColor.png" id="2_p7vnf"]
 [ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="3_b1r4v"]
+[ext_resource type="Texture2D" uid="uid://d2sbpjwjj54p1" path="res://assets/units/Hull_01_Mask.png" id="3_vbjhi"]
+[ext_resource type="Script" path="res://Body.gd" id="5_iagsv"]
+[ext_resource type="Texture2D" uid="uid://c8mkifvvb474o" path="res://assets/units/Gun_01_NoColor.png" id="6_2r3h7"]
+[ext_resource type="Texture2D" uid="uid://dp7gnsbbd7acf" path="res://assets/units/Gun_01_Mask.png" id="6_rkj3g"]
+[ext_resource type="Shader" path="res://assets/shaders/unit_colorizer.gdshader" id="6_tatij"]
 
-[sub_resource type="QuadMesh" id="1"]
-size = Vector2(40, 40)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_l6242"]
+shader = ExtResource("6_tatij")
+shader_parameter/color = Color(1, 0, 0, 1)
+shader_parameter/mask = ExtResource("3_vbjhi")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_otfse"]
+shader = ExtResource("6_tatij")
+shader_parameter/color = Color(1, 0, 0, 1)
+shader_parameter/mask = ExtResource("6_rkj3g")
 
 [node name="Unit" type="Area2D"]
-z_index = 3
 collision_layer = 2
 script = ExtResource("1")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2")
+[node name="Body" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_l6242")
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("2_p7vnf")
+script = ExtResource("5_iagsv")
 
-[node name="Model" type="MeshInstance2D" parent="."]
-visible = false
-modulate = Color(1, 0, 0, 1)
-mesh = SubResource("1")
+[node name="Weapon" type="Sprite2D" parent="Body"]
+material = SubResource("ShaderMaterial_otfse")
+texture = ExtResource("6_2r3h7")
 
 [node name="Outline" type="Line2D" parent="."]
 visible = false
@@ -28,12 +41,13 @@ default_color = Color(0, 0, 0, 1)
 begin_cap_mode = 1
 
 [node name="Integrity" type="Label" parent="."]
-offset_left = -11.5672
-offset_top = -6.44879
-offset_right = 12.4328
-offset_bottom = 7.55121
+offset_left = -12.0
+offset_top = -12.0
+offset_right = 12.0
+offset_bottom = 11.0
 text = "999"
 clip_text = true
 max_lines_visible = 1
 
 [node name="CollisionPolygon2D" parent="." instance=ExtResource("3_b1r4v")]
+visible = false

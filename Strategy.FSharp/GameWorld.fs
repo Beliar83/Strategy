@@ -79,8 +79,8 @@ type GameWorld() =
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
         let players =
-            Map [ "Player1", { Color = Colors.Red }
-                  "Player2", { Color = Colors.Blue } ]
+            Map [ "Player1", { Color = ColorFromGodotColor(Colors.Red) }
+                  "Player2", { Color = ColorFromGodotColor(Colors.Blue) } ]
 
         world.AddResource("Players", players)
 

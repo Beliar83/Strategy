@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://cqxjpg05ahp1u"]
+[gd_scene load_steps=4 format=3 uid="uid://cr8d0d08xcjbd"]
 
 [ext_resource type="Script" path="res://GameWorld.cs" id="1"]
 [ext_resource type="Script" path="res://HexMap.cs" id="2"]
