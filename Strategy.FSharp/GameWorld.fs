@@ -23,6 +23,7 @@ type Draw =
 
 
 
+
 let CreateGrid radius =
 
     let CreateCube (q, r) = Hexagon.NewAxial q r
@@ -65,7 +66,7 @@ type GameWorld() =
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("FieldsNeedUpdate", false)
         world.AddResource("CurrentPlayer", "Player1")
-        world.AddResource("WorldNode", this.GetInstanceId())        
+        world.AddResource("WorldNode", this.GetInstanceId())
         let unitsNode = this.GetNode(new NodePath("Units"))
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
 
@@ -103,9 +104,18 @@ type GameWorld() =
             world.On<FrameUpdate>
             <| fun _ ->
                 for entity in world.Query<Position, Node>() do
-                    let node = GodotObject.InstanceFromId(entity.Value2.NodeId) :?> Node2D
+                    let node =
+                        GodotObject.InstanceFromId(entity.Value2.NodeId) :?> Node2D
+
                     node.Position <- Vector2(entity.Value1.X, entity.Value1.Y)
-        
+
+                for entity in world.Query<UnitPosition, Node>() do
+                    let node =
+                        GodotObject.InstanceFromId(entity.Value2.NodeId) :?> UnitNode
+
+                    node.SetBodyRotation(entity.Value1.BodyRotation)
+                    node.SetWeaponRotation(entity.Value1.WeaponRotation)
+
         physicsUpdate <-
             world.On<PhysicsUpdate>
             <| fun _ ->
@@ -143,20 +153,27 @@ type GameWorld() =
                     let nextPlayer = playerQueue.Dequeue()
                     world.AddResource("CurrentPlayer", nextPlayer)
                     ChangeState Waiting world
-                | Moving(eid, path) ->
+                | Moving (eid, path) ->
                     if path.Length > 0 then
-                        let entity = world.Get(eid)                    
+                        let entity = world.Get(eid)
                         let newCell = path.Head
                         let unit = entity.Get<Unit>()
-                        entity.Set(newCell)
-                        entity.Set({unit with RemainingRange = unit.RemainingRange - 1 })
-                        ChangeState (Moving(eid, path.Tail)) world
+                        let position = entity.Get<UnitPosition>()
+
+                        entity.Set({ position with Position = newCell })
+
+                        entity.Set(
+                            { unit with
+                                  RemainingRange = unit.RemainingRange - 1 }
+                        )
+
+                        ChangeState(Moving(eid, path.Tail)) world
                     else
                         ChangeState Waiting world
                         world.AddResource("FieldsNeedUpdate", true)
                 | _ -> ()
-                
-                
+
+
 
         world
             .Create()
@@ -170,9 +187,14 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 0 }
             )
-            .With(Hexagon.NewAxial -1 -1)
+            .With(
+                { Position = Hexagon.NewAxial -1 -1
+                  BodyRotation = 90.0f
+                  WeaponRotation = 90.0f }
+            )
             .With({ PlayerId = "Player1" })
         |> ignore
+
         world
             .Create()
             .With(
@@ -185,10 +207,14 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 0 }
             )
-            .With(Hexagon.NewAxial -1 1)
+            .With(
+                { Position = Hexagon.NewAxial -1 1
+                  BodyRotation = 90.0f
+                  WeaponRotation = 90.0f }
+            )
             .With({ PlayerId = "Player1" })
         |> ignore
-        
+
         world
             .Create()
             .With(
@@ -198,10 +224,14 @@ type GameWorld() =
                   MinAttackRange = 1
                   Armor = 1
                   Mobility = 3
-                  RemainingRange = 5
+                  RemainingRange = 3
                   RemainingAttacks = 0 }
             )
-            .With(Hexagon.NewAxial 1 1)
+            .With(
+                { Position = Hexagon.NewAxial 1 -1
+                  BodyRotation = 270.0f
+                  WeaponRotation = 270.0f }
+            )
             .With({ PlayerId = "Player2" })
         |> ignore
 
@@ -214,18 +244,21 @@ type GameWorld() =
                   MinAttackRange = 1
                   Armor = 1
                   Mobility = 3
-                  RemainingRange = 7
+                  RemainingRange = 3
                   RemainingAttacks = 0 }
             )
-            .With(Hexagon.NewAxial 0 0)
+            .With(
+                { Position = Hexagon.NewAxial 1 1
+                  BodyRotation = 270.0f
+                  WeaponRotation = 270.0f }
+            )
             .With({ PlayerId = "Player2" })
         |> ignore
 
         // First state needs to be set directly
         world.AddResource("State", GameState.NewRound)
-        
-    override this._Process(delta) =
-        world.Run <| { FrameDelta = delta }
+
+    override this._Process(delta) = world.Run <| { FrameDelta = delta }
 
     override this._PhysicsProcess(delta) = world.Run <| { PhysicsDelta = delta }
 
@@ -271,38 +304,48 @@ type GameWorld() =
         | Waiting -> handleWaiting event
         | Selected (cell, entity) -> handleSelected event cell entity
         | _ -> ()
-    
+
     override this._Draw() =
         let state = world.LoadResource<GameState>("State")
+
         match state with
         | Startup
         | NewRound
         | Waiting -> ()
-        | Selected(hexagon, _) ->
+        | Selected (hexagon, _) ->
             let unitEntity =
-                getEntitiesAtHexagon(hexagon, world)
+                getEntitiesAtHexagon (hexagon, world)
                 |> Array.map world.Get
-                |> Array.choose (fun entity ->
-                    if entity.Has<Unit>() && entity.Has<Player>() then
-                        Some(entity)
-                    else
-                        None
-                    )
+                |> Array.choose
+                    (fun entity ->
+                        if entity.Has<Unit>() && entity.Has<Player>() then
+                            Some(entity)
+                        else
+                            None)
                 |> Array.tryHead
+
             match unitEntity with
             | None -> ()
             | Some unitEntity ->
-                let currentPlayer = world.LoadResource<string>("CurrentPlayer")
+                let currentPlayer =
+                    world.LoadResource<string>("CurrentPlayer")
+
                 let unitPlayer = unitEntity.Get<Player>()
+
                 if unitPlayer.PlayerId = currentPlayer then
                     let unit = unitEntity.Get<Unit>()
-                    let cell = world.LoadResource<Option<Hexagon>>("CursorCell")
+
+                    let cell =
+                        world.LoadResource<Option<Hexagon>>("CursorCell")
+
                     match cell with
                     | None -> ()
                     | Some cell ->
                         let path = findPath (hexagon, cell, world)
+
                         if path.Length <= unit.RemainingRange then
                             let mutable currentCell = hexagon
+
                             if path.Length > 0 then
                                 for cell in path do
                                     let fromPosition = currentCell.Get2DPosition

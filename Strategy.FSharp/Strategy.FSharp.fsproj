@@ -13,6 +13,7 @@
         <Compile Include="MapUI.fs"/>
         <Compile Include="Input.fs"/>
         <Compile Include="Nodes.fs"/>
+        <Compile Include="Body.fs"/>
         <Compile Include="Unit.fs"/>
         <Compile Include="HexMap.fs"/>
         <Compile Include="GameWorld.fs"/>

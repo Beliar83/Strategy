@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://bvftq2m403qix" path="res://assets/units/Hull_01_NoColor.png" id="2_p7vnf"]
 [ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="3_b1r4v"]
 [ext_resource type="Texture2D" uid="uid://d2sbpjwjj54p1" path="res://assets/units/Hull_01_Mask.png" id="3_vbjhi"]
-[ext_resource type="Script" path="res://Body.gd" id="5_iagsv"]
+[ext_resource type="Script" path="res://Body.cs" id="5_lhfhs"]
 [ext_resource type="Texture2D" uid="uid://c8mkifvvb474o" path="res://assets/units/Gun_01_NoColor.png" id="6_2r3h7"]
 [ext_resource type="Texture2D" uid="uid://dp7gnsbbd7acf" path="res://assets/units/Gun_01_Mask.png" id="6_rkj3g"]
 [ext_resource type="Shader" path="res://assets/shaders/unit_colorizer.gdshader" id="6_tatij"]
@@ -22,12 +22,13 @@ shader_parameter/mask = ExtResource("6_rkj3g")
 [node name="Unit" type="Area2D"]
 collision_layer = 2
 script = ExtResource("1")
+BodyNode = NodePath("Body")
 
 [node name="Body" type="Sprite2D" parent="."]
 material = SubResource("ShaderMaterial_l6242")
 scale = Vector2(0.2, 0.2)
 texture = ExtResource("2_p7vnf")
-script = ExtResource("5_iagsv")
+script = ExtResource("5_lhfhs")
 
 [node name="Weapon" type="Sprite2D" parent="Body"]
 material = SubResource("ShaderMaterial_otfse")

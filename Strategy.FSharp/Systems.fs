@@ -9,10 +9,15 @@ open Strategy.FSharp.Hexagon
 type PhysicsUpdate = { PhysicsDelta: float }
 
 [<Struct>]
-type FrameUpdate = { FrameDelta : float }
+type FrameUpdate = { FrameDelta: float }
 
 [<Struct>]
 type Position = { X: float32; Y: float32 }
+
+type UnitPosition =
+    { Position: Hexagon
+      BodyRotation: float32
+      WeaponRotation: float32 }
 
 type GameState =
     | Startup
@@ -70,11 +75,20 @@ let ChangeState newState (container: Container) =
             match newState with
             | Waiting -> newState
             | _ -> state
-        | Moving(currentEid, currentPath) ->
+        | Moving (currentEid, currentPath) ->
             match newState with
-            | Waiting -> if (currentPath.Length <= 0) then newState else state
-            | Moving(eid, path) -> if (eid = currentEid && path.Length < currentPath.Length) then newState else state
+            | Waiting ->
+                if (currentPath.Length <= 0) then
+                    newState
+                else
+                    state
+            | Moving (eid, path) ->
+                if (eid = currentEid
+                    && path.Length < currentPath.Length) then
+                    newState
+                else
+                    state
             | _ -> state
-        
+
 
     container.AddResource("State", changedState)

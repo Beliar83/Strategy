@@ -17,7 +17,7 @@ type Unit =
       RemainingRange: int32
       RemainingAttacks: int32 }
 
-let IsInMovementRange(unit : Unit, distance: int) =
+let IsInMovementRange (unit: Unit, distance: int) =
     (distance > 0 && unit.RemainingRange >= distance)
 
 type UnitNode() =
@@ -26,6 +26,8 @@ type UnitNode() =
     let mutable integrity = 0
     let mutable cell = Hexagon.Zero
     let mutable selected = false
+    let mutable bodyNode: NodePath = Unchecked.defaultof<_>
+    let mutable weaponNode: NodePath = Unchecked.defaultof<_>
 
     member this.Integrity
         with get () = integrity
@@ -49,13 +51,28 @@ type UnitNode() =
             outline.Visible <- value
             selected <- value
 
-    member this.SetColor(color : Color) =
-        let body = this.GetNode(new NodePath("Body")) :?> CanvasItem
+    member this.BodyNode
+        with get () = bodyNode
+        and set value = bodyNode <- value
+
+    member this.SetColor(color: Color) =
+        let body = this.GetNode(bodyNode) :?> CanvasItem
         let material = body.Material :?> ShaderMaterial
         material.SetShaderParameter("color", GodotColorFromColor(color))
-        let weapon = body.GetNode(new NodePath("Weapon")) :?> CanvasItem
+
+        let weapon =
+            body.GetNode(new NodePath("Weapon")) :?> CanvasItem
+
         let material = weapon.Material :?> ShaderMaterial
         material.SetShaderParameter("color", GodotColorFromColor(color))
+
+    member this.SetBodyRotation(rotation: float32) =
+        let body = this.GetNode(bodyNode) :?> Body
+        body.SetBodyRotation(rotation)
+
+    member this.SetWeaponRotation(rotation: float32) =
+        let body = this.GetNode(bodyNode) :?> Body
+        body.SetWeaponRotation(rotation)
 
 module UnitSystem =
 
@@ -63,11 +80,16 @@ module UnitSystem =
         c.On<PhysicsUpdate>
         <| fun _ ->
             let unitsNode = c.LoadResource<uint64>("UnitsNode")
-            let unitsNode = GodotObject.InstanceFromId(unitsNode) :?> Node2D
-            let players = c.LoadResource<Map<string,PlayerData>>("Players")
-            for entity in c.Query<Eid, Unit, Hexagon>() do
+
+            let unitsNode =
+                GodotObject.InstanceFromId(unitsNode) :?> Node2D
+
+            let players =
+                c.LoadResource<Map<string, PlayerData>>("Players")
+
+            for entity in c.Query<Eid, Unit, UnitPosition>() do
                 let id = entity.Value1
-                let cell = entity.Value3
+                let cell = entity.Value3.Position
 
                 let entity = c.Get id
 
@@ -78,14 +100,15 @@ module UnitSystem =
                     let node = node.Instantiate() :?> UnitNode
                     entity.Add { NodeId = node.GetInstanceId() }
                     node.Position <- cell.Get2DPosition
+
                     if entity.Has<Player>() then
                         let player = entity.Get<Player>()
                         node.SetColor(players[player.PlayerId].Color)
-                    
+
                     unitsNode.AddChild node
                     entity.Add { NodeId = node.GetInstanceId() }
 
-            for entity in c.Query<Eid, Unit, Node, Hexagon>() do
+            for entity in c.Query<Eid, Unit, Node, UnitPosition>() do
                 let id = entity.Value1
                 let unit = entity.Value2
                 let node = entity.Value3
@@ -93,13 +116,14 @@ module UnitSystem =
                 let node =
                     GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
-                let cell = entity.Value4
+                let cell = entity.Value4.Position
 
                 node.Integrity <- unit.Integrity
                 node.Cell <- cell
 
     let rec updateSelection (container: Container) =
-        let state = container.LoadResource<GameState>("State")
+        let state =
+            container.LoadResource<GameState>("State")
 
         let isSelected =
             match state with
@@ -109,7 +133,7 @@ module UnitSystem =
                 | None -> fun _ -> false
             | _ -> fun _ -> false
 
-        for entity in container.Query<Eid, Unit, Node, Hexagon>() do
+        for entity in container.Query<Eid, Unit, Node, UnitPosition>() do
             let id = entity.Value1
             let node = entity.Value3
 
@@ -117,7 +141,7 @@ module UnitSystem =
                 GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
             node.Selected <- isSelected id
-    
+
     let registerSelectCell (container: Container) =
         container.On<SelectCell>
         <| fun _ -> updateSelection container
@@ -125,7 +149,7 @@ module UnitSystem =
     let registerDeselectCell (container: Container) =
         container.On<DeselectCell>
         <| fun _ -> updateSelection container
-        
+
     let register (c: Container) =
         Disposable.Create [ registerUpdateUnitNodes c
                             registerSelectCell c

@@ -1,2 +1,2 @@
-﻿PR GAMES & APPS (https://opengameart.org/content/game-ui-simple-outline-circles)
-CraftPix.net 2D Game Assets (https://opengameart.org/content/2d-battle-tanks)
+PR GAMES & APPS (https://opengameart.org/content/game-ui-simple-outline-circles)
+CraftPix.net 2D Game Assets (https://opengameart.org/content/2d-battle-tanks) (Assets were modified to allow more color variations)

@@ -138,8 +138,8 @@ let UpdateCursorCell(cell: Hexagon) (c: Container) =
 
 let getEntitiesAtHexagon(cell: Hexagon, container : Container) =
     let position = cell.Get2DPosition
-    container.Query<Eid, Hexagon>()
-    |> Seq.filter (fun query -> query.Value2 = cell)
+    container.Query<Eid, UnitPosition>()
+    |> Seq.filter (fun query -> query.Value2.Position = cell)
     |> Seq.map (_.Value1)
     |> Array.ofSeq
     
@@ -205,9 +205,9 @@ module HexMapSystem =
     let registerUpdatePosition (c: Container) =
         c.On<FrameUpdate>
         <| fun _ ->
-            for entity in c.Query<Eid, Hexagon>() do
+            for entity in c.Query<Eid, UnitPosition>() do
                 let entityId = entity.Value1
-                let hexagon = entity.Value2
+                let hexagon = entity.Value2.Position
                 let entity = c.Get entityId
                 let position = hexagon.Get2DPosition
                 entity.Add { X = position.X; Y = position.Y }    
@@ -298,8 +298,8 @@ module HexMapSystem =
             let state = c.LoadResource<GameState>("State")
 
             let getEntitiesAtCell (cell: Hexagon) =
-                c.Query<Eid, Hexagon>()
-                |> Seq.filter (fun x -> x.Value2 = cell)
+                c.Query<Eid, UnitPosition>()
+                |> Seq.filter (fun x -> x.Value2.Position = cell)
                 |> Seq.map (fun x -> c.Get x.Value1)
                 |> Seq.toArray
 
@@ -347,7 +347,7 @@ module HexMapSystem =
                                     | None -> None
                                     | Some eid ->
                                         let entity = c.Get(eid)
-                                        if entity.Has<Unit>() && entity.Has<Hexagon>() then
+                                        if entity.Has<Unit>() && entity.Has<UnitPosition>() then
                                             Some(entity)
                                         else
                                             None
@@ -356,15 +356,13 @@ module HexMapSystem =
                             | None -> ()
                             | Some entity ->
                                 let unit = entity.Get<Unit>()
-                                let unitCell = entity.Get<Hexagon>()
-                                let path = findPath(unitCell, cell, c)
+                                let unitCell = entity.Get<UnitPosition>()
+                                let path = findPath(unitCell.Position, cell, c)
                                 if IsInMovementRange(unit, path.Length) then
                                     { Label = "Move"; Command = (fun () -> moveCommand(entity.Id, path)); ItemType = ItemType.IconItem("res://assets/icons/move.png") }
                                 else
                                     ()                            
                         |]
-                
-                //IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
                 
                 let position = cell.Get2DPosition
 
