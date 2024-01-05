@@ -283,6 +283,10 @@ module HexMapSystem =
                                         let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
                                         if (result.Count = 0) then
                                             emitHighlightAttackable cell cellNodes |> ignore
+                                        else
+                                            let position = result["position"].AsVector2()
+                                            if Hexagon.At2DPosition(position) = cell then
+                                                emitHighlightAttackable cell cellNodes |> ignore
                 | _ -> ()
 
                 c.AddResource("FieldsNeedUpdate", false)

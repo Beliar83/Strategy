@@ -22,8 +22,6 @@ type Draw =
     end
 
 
-
-
 let CreateGrid radius =
 
     let CreateCube (q, r) = Hexagon.NewAxial q r
@@ -159,9 +157,9 @@ type GameWorld() =
                         let newCell = path.Head
                         let unit = entity.Get<Unit>()
                         let position = entity.Get<UnitPosition>()
-                        
+
                         let oldCell = position.Position
-                        
+
                         let bodyRotation =
                             if newCell = oldCell.GetNeighbour(Direction.NorthEast) then
                                 30.0f
@@ -176,9 +174,13 @@ type GameWorld() =
                             else if newCell = oldCell.GetNeighbour(Direction.NorthWest) then
                                 330.0f
                             else
-                                0f                                
-                        
-                        entity.Set({ Position = newCell; BodyRotation = bodyRotation; WeaponRotation = bodyRotation })
+                                0f
+
+                        entity.Set(
+                            { Position = newCell
+                              BodyRotation = bodyRotation
+                              WeaponRotation = bodyRotation }
+                        )
 
                         entity.Set(
                             { unit with
