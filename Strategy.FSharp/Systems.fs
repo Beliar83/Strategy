@@ -48,10 +48,33 @@ type ShowCellMenu =
       Position: Vector2I
       ClosedHandler: Unit -> Unit }
 
+type Unit =
+    { Integrity: int32
+      Damage: int32
+      MaxAttackRange: int32
+      MinAttackRange: int32
+      Armor: int32
+      Mobility: int32
+      RemainingRange: int32
+      RemainingAttacks: int32 }
+
 let ChangeState newState (container: Container) =
     let state =
         container.LoadResource<GameState> "State"
 
+    let selectCell(cell: Hexagon) = 
+        container.AddResource("FieldsNeedUpdate", true)
+        container.Send { SelectedCell = cell }
+    
+    let deselectCell(cell: Hexagon) =
+        container.Send { DeselectedCell = cell }
+        container.AddResource("FieldsNeedUpdate", true)        
+    
+    let resetUnits() =
+        for entity in container.Query<Eid, Unit>() do
+            let unit = entity.Value2
+            container.Get(entity.Value1).Set( { unit with RemainingRange = unit.Mobility; RemainingAttacks = 1 })
+    
     let changedState =
         match state with
         | Startup ->
@@ -61,20 +84,27 @@ let ChangeState newState (container: Container) =
         | Waiting ->
             match newState with
             | Startup
-            | NewRound
             | ContextMenu
             | Waiting -> newState
             | Selected (cell, _) ->
-                    container.AddResource("FieldsNeedUpdate", true)
-                    container.Send { SelectedCell = cell }
+                    selectCell(cell)
                     newState                
             | Moving _ -> state
+            | NewRound ->
+                resetUnits()
+                newState
         | Selected (cell, _) ->
             match newState with
-            | Startup -> state
+            | Startup ->
+                deselectCell(cell)
+                state
+            | NewRound ->
+                resetUnits()
+                deselectCell(cell)
+                newState
+            | Selected _ -> state
             | _ ->
-                container.Send { DeselectedCell = cell }
-                container.AddResource("FieldsNeedUpdate", true)
+                deselectCell(cell)
                 newState
         | NewRound ->
             match newState with
@@ -97,8 +127,10 @@ let ChangeState newState (container: Container) =
         | ContextMenu ->
             match newState with
             | Selected (cell, _) ->
-                container.AddResource("FieldsNeedUpdate", true)
-                container.Send { SelectedCell = cell }
+                selectCell(cell)
+                newState
+            | NewRound ->
+                resetUnits()
                 newState
             | _ -> newState
             

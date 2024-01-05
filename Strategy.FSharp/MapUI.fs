@@ -53,7 +53,7 @@ type MapUI() =
 
             playerNameLabel.Text <- String.Empty
 
-    member this.ShowContextMenu (items: List<MenuItem>) (position: Vector2I) (closed: Unit -> Unit) =
+    member this.ShowContextMenu (items: List<MenuItem>) (position: Vector2I) (closed: FSharp.Core.Unit -> FSharp.Core.Unit) =
         match contextMenu with
         | None -> GD.PrintErr("MapUI: ContextMenu is not set")
         | Some contextMenu ->

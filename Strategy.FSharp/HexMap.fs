@@ -247,12 +247,13 @@ module HexMapSystem =
                                 false
                         for cell in cells do
                             let distanceToUnit = cell.DistanceTo(hexagon)
-                            if selectedCellPlayer.PlayerId = currentPlayer then
+                            let doesSelectedUnitBelongToCurrentPlayer = selectedCellPlayer.PlayerId = currentPlayer
+                            if doesSelectedUnitBelongToCurrentPlayer then
                                 if distanceToUnit <= unit.RemainingRange then
                                     let canMove = IsInMovementRange(unit, findPath(hexagon, cell, c).Length) 
                                     if canMove then
                                         emitHighlightMovable cell cellNodes |> ignore
-                            if distanceToUnit >= unit.MinAttackRange && distanceToUnit <= unit.MaxAttackRange then
+                            if (unit.RemainingAttacks > 0 || not <| doesSelectedUnitBelongToCurrentPlayer) && distanceToUnit >= unit.MinAttackRange && distanceToUnit <= unit.MaxAttackRange then
                                 let entitiesAtTarget = getEntitiesAtHexagon(cell, c)
                                 let isTargetSamePlayer =
                                     entitiesAtTarget

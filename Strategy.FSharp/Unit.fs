@@ -7,16 +7,6 @@ open Strategy.FSharp.Player
 open Strategy.FSharp.Systems
 open Strategy.FSharp.Nodes
 
-type Unit =
-    { Integrity: int32
-      Damage: int32
-      MaxAttackRange: int32
-      MinAttackRange: int32
-      Armor: int32
-      Mobility: int32
-      RemainingRange: int32
-      RemainingAttacks: int32 }
-
 let IsInMovementRange (unit: Unit, distance: int) =
     (distance > 0 && unit.RemainingRange >= distance)
 

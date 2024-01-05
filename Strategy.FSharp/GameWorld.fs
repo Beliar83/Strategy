@@ -208,7 +208,7 @@ type GameWorld() =
                   Armor = 1
                   Mobility = 3
                   RemainingRange = 3
-                  RemainingAttacks = 0 }
+                  RemainingAttacks = 1 }
             )
             .With(
                 { Position = Hexagon.NewAxial -1 -1
@@ -228,7 +228,7 @@ type GameWorld() =
                   Armor = 1
                   Mobility = 3
                   RemainingRange = 3
-                  RemainingAttacks = 0 }
+                  RemainingAttacks = 1 }
             )
             .With(
                 { Position = Hexagon.NewAxial -1 1
