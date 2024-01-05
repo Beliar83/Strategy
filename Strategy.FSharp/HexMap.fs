@@ -284,8 +284,10 @@ module HexMapSystem =
                                         if (result.Count = 0) then
                                             emitHighlightAttackable cell cellNodes |> ignore
                                         else
-                                            let position = result["position"].AsVector2()
-                                            if Hexagon.At2DPosition(position) = cell then
+                                            let hitId = result["collider_id"].AsUInt64()
+                                            let hitNode = GodotObject.InstanceFromId(hitId) :?> Node2D
+                                            let hitHexagon = Hexagon.At2DPosition(hitNode.Position)
+                                            if hitHexagon = cell then
                                                 emitHighlightAttackable cell cellNodes |> ignore
                 | _ -> ()
 
@@ -312,12 +314,8 @@ module HexMapSystem =
 
                 let entities = getEntitiesAtCell cell
 
-                let selectCell (cell: Hexagon) =
-                    c.Send { SelectedCell = cell }
                 let entityCommand entityId =
                     ChangeState (GameState.Selected(cell, Some(entityId))) c
-                    c.AddResource("FieldsNeedUpdate", true)
-                    selectCell cell
 
                 let moveCommand(entityId, path) =
                     ChangeState (GameState.Moving(entityId, path)) c
@@ -356,6 +354,7 @@ module HexMapSystem =
                                         else
                                             None
                                 | Moving _ -> None
+                                | ContextMenu -> None
                             match currentUnitEntity with
                             | None -> ()
                             | Some entity ->
@@ -381,6 +380,7 @@ module HexMapSystem =
 
                 let close () =
                     c.AddResource("CursorPosition", camera.GetLocalMousePosition())
+                    ChangeState Waiting c
 
                 let items =
                     Array.append
@@ -396,6 +396,9 @@ module HexMapSystem =
                              Command = close
                              ItemType = ItemType.Item } |]
 
+                let state = c.LoadResource<GameState>("State")
+                ChangeState GameState.ContextMenu c                
+                
                 c.Run {Items = Array.toList items; Position = Vector2I.op_Explicit position; ClosedHandler = close}
 
             match state with
@@ -409,7 +412,8 @@ module HexMapSystem =
                     showContextMenuForCell cursorCell
                 | None -> ()
             | Moving _ -> ()
-            // TODO: Attacking, Moving
+            | ContextMenu -> ()
+            // TODO: Attacking
 
         let handleCancel () =
             match c.LoadResource<GameState>("State") with

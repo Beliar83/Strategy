@@ -189,8 +189,11 @@ type GameWorld() =
 
                         ChangeState(Moving(eid, path.Tail)) world
                     else
-                        ChangeState Waiting world
                         world.AddResource("FieldsNeedUpdate", true)
+                        ChangeState Waiting world
+                        let position = world.Get(eid).Get<UnitPosition>()
+                        world.AddResource<Option<Hexagon>>("CursorCell", Some(position.Position))
+                        world.Send({ Button = Button.Select})
                 | _ -> ()
 
 
@@ -372,4 +375,5 @@ type GameWorld() =
                                     let toPosition = cell.Get2DPosition
                                     this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
                                     currentCell <- cell
-        | Moving _ -> ()
+        | Moving _
+        | ContextMenu -> ()

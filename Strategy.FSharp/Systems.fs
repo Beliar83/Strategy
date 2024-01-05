@@ -23,6 +23,7 @@ type GameState =
     | Startup
     | NewRound
     | Waiting
+    | ContextMenu
     | Selected of Hexagon * Option<Eid>
     | Moving of Eid * list<Hexagon>
 
@@ -61,8 +62,12 @@ let ChangeState newState (container: Container) =
             match newState with
             | Startup
             | NewRound
+            | ContextMenu
             | Waiting -> newState
-            | Selected _ -> newState
+            | Selected (cell, _) ->
+                    container.AddResource("FieldsNeedUpdate", true)
+                    container.Send { SelectedCell = cell }
+                    newState                
             | Moving _ -> state
         | Selected (cell, _) ->
             match newState with
@@ -89,6 +94,16 @@ let ChangeState newState (container: Container) =
                 else
                     state
             | _ -> state
+        | ContextMenu ->
+            match newState with
+            | Selected (cell, _) ->
+                container.AddResource("FieldsNeedUpdate", true)
+                container.Send { SelectedCell = cell }
+                newState
+            | _ -> newState
+            
+    let worldNode = GodotObject.InstanceFromId(container.LoadResource<uint64>("WorldNode")) :?> Node2D            
+    worldNode.QueueRedraw()
 
 
     container.AddResource("State", changedState)
