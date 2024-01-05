@@ -159,8 +159,26 @@ type GameWorld() =
                         let newCell = path.Head
                         let unit = entity.Get<Unit>()
                         let position = entity.Get<UnitPosition>()
-
-                        entity.Set({ position with Position = newCell })
+                        
+                        let oldCell = position.Position
+                        
+                        let bodyRotation =
+                            if newCell = oldCell.GetNeighbour(Direction.NorthEast) then
+                                30.0f
+                            else if newCell = oldCell.GetNeighbour(Direction.East) then
+                                90.0f
+                            else if newCell = oldCell.GetNeighbour(Direction.SouthEast) then
+                                150.0f
+                            else if newCell = oldCell.GetNeighbour(Direction.SouthWest) then
+                                210.0f
+                            else if newCell = oldCell.GetNeighbour(Direction.West) then
+                                270.0f
+                            else if newCell = oldCell.GetNeighbour(Direction.NorthWest) then
+                                330.0f
+                            else
+                                0f                                
+                        
+                        entity.Set({ Position = newCell; BodyRotation = bodyRotation; WeaponRotation = bodyRotation })
 
                         entity.Set(
                             { unit with
