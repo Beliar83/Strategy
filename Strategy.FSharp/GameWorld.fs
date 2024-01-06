@@ -1,6 +1,5 @@
 ﻿module Strategy.FSharp.GameWorld
 
-
 open System
 open System.Collections.Generic
 open Godot
@@ -203,6 +202,13 @@ type GameWorld() =
 
                     let damage = attackerUnit.Damage - attackedUnit.Armor
                     let remainingIntegrity = attackedUnit.Integrity - damage
+                    let attackerPosition = attackerEntity.Get<UnitPosition>()
+                    let attackedPosition = attackedEntity.Get<UnitPosition>()
+                    let direction = attackerPosition.Position.Get2DPosition.DirectionTo(attackedPosition.Position.Get2DPosition) 
+                    let angle = direction.Angle()
+                    let angle = Mathf.RadToDeg(angle) + 90.0f // The calculated angle is off by 90° from what we need
+                    
+                    attackerEntity.Set({ attackerPosition with WeaponRotation = angle })
 
                     attackedEntity.Set(
                         { attackedUnit with
@@ -220,8 +226,6 @@ type GameWorld() =
 
                         unitNode.Destroy()
                         world.Destroy(attacked)
-
-                    let attackerPosition = attackerEntity.Get<UnitPosition>()
 
                     ChangeState(GameState.Selected(attackerPosition.Position, Some(attacker))) world
                 | _ -> ()

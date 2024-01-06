@@ -32,7 +32,9 @@ script = ExtResource("5_lhfhs")
 
 [node name="Weapon" type="Sprite2D" parent="Body"]
 material = SubResource("ShaderMaterial_otfse")
+position = Vector2(0, 45)
 texture = ExtResource("6_2r3h7")
+offset = Vector2(0, -45)
 
 [node name="Outline" type="Line2D" parent="."]
 visible = false
