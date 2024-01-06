@@ -3,6 +3,7 @@ module Strategy.FSharp.Systems
 open System
 open Godot
 open Garnet.Composition
+open Microsoft.FSharp.Core
 open Strategy.FSharp.Hexagon
 
 [<Struct>]
@@ -23,9 +24,10 @@ type GameState =
     | Startup
     | NewRound
     | Waiting
-    | ContextMenu
+    | ContextMenu of GameState
     | Selected of Hexagon * Option<Eid>
     | Moving of Eid * list<Hexagon>
+    | Attacking of Eid * Eid
 
 [<Struct>]
 type SelectCell = { SelectedCell: Hexagon }
@@ -58,83 +60,122 @@ type Unit =
       RemainingRange: int32
       RemainingAttacks: int32 }
 
-let ChangeState newState (container: Container) =
-    let state =
-        container.LoadResource<GameState> "State"
+let rec getChangedState (container: Container) currentState newState =
+    let getChangedState = getChangedState container
 
-    let selectCell(cell: Hexagon) = 
+    let selectCell (cell: Hexagon) =
         container.AddResource("FieldsNeedUpdate", true)
         container.Send { SelectedCell = cell }
-    
-    let deselectCell(cell: Hexagon) =
+
+    let deselectCell (cell: Hexagon) =
         container.Send { DeselectedCell = cell }
-        container.AddResource("FieldsNeedUpdate", true)        
-    
-    let resetUnits() =
+        container.AddResource("FieldsNeedUpdate", true)
+
+    let resetUnits () =
         for entity in container.Query<Eid, Unit>() do
             let unit = entity.Value2
-            container.Get(entity.Value1).Set( { unit with RemainingRange = unit.Mobility; RemainingAttacks = 1 })
-    
-    let changedState =
-        match state with
-        | Startup ->
-            match newState with
-            | NewRound -> newState
-            | _ -> state
-        | Waiting ->
-            match newState with
-            | Startup
-            | ContextMenu
-            | Waiting -> newState
-            | Selected (cell, _) ->
-                    selectCell(cell)
-                    newState                
-            | Moving _ -> state
-            | NewRound ->
-                resetUnits()
-                newState
+
+            container
+                .Get(entity.Value1)
+                .Set(
+                    { unit with
+                          RemainingRange = unit.Mobility
+                          RemainingAttacks = 1 }
+                )
+
+    let changeFromStartup () =
+        match newState with
+        | NewRound -> newState
+        | _ -> currentState
+
+    let changeFromWaiting () =
+        match newState with
+        | Startup
+        | ContextMenu _
+        | Waiting -> newState
         | Selected (cell, _) ->
-            match newState with
-            | Startup ->
-                deselectCell(cell)
-                state
-            | NewRound ->
-                resetUnits()
-                deselectCell(cell)
-                newState
-            | Selected _ -> state
-            | _ ->
-                deselectCell(cell)
-                newState
+            selectCell (cell)
+            newState
+        | Moving _
+        | Attacking _ -> currentState
         | NewRound ->
-            match newState with
-            | Waiting -> newState
-            | _ -> state
-        | Moving (currentEid, currentPath) ->
-            match newState with
-            | Waiting ->
-                if (currentPath.Length <= 0) then
+            resetUnits ()
+            newState
+
+    let changeFromSelected (cell, eid) =
+        match newState with
+        | Startup ->
+            deselectCell (cell)
+            currentState
+        | NewRound ->
+            resetUnits ()
+            deselectCell (cell)
+            newState
+        | Attacking (attacker, _) ->
+            match eid with
+            | None -> currentState
+            | Some selected ->
+                if selected = attacker then
                     newState
                 else
-                    state
-            | Moving (eid, path) ->
-                if (eid = currentEid
-                    && path.Length < currentPath.Length) then
-                    newState
-                else
-                    state
-            | _ -> state
-        | ContextMenu ->
-            match newState with
-            | Selected (cell, _) ->
-                selectCell(cell)
+                    currentState
+        | Selected (cell, _) ->
+            selectCell (cell)
+            newState
+        | _ ->
+            deselectCell (cell)
+            newState
+
+    let changeFromNewRound () =
+        match newState with
+        | Waiting -> newState
+        | _ -> currentState
+
+    let changeFromMoving (currentEid, currentPath: Hexagon list) =
+        match newState with
+        | Waiting ->
+            if (currentPath.Length <= 0) then
                 newState
-            | NewRound ->
-                resetUnits()
+            else
+                currentState
+        | Moving (eid, path) ->
+            if (eid = currentEid
+                && path.Length < currentPath.Length) then
                 newState
-            | _ -> newState
-            
-    let worldNode = GodotObject.InstanceFromId(container.LoadResource<uint64>("WorldNode")) :?> Node2D            
+            else
+                currentState
+        | _ -> currentState
+
+    let changeStateFromAttacking () =
+        match newState with
+        | ContextMenu _ -> newState
+        | Waiting -> newState
+        | Selected (cell, _) ->
+            selectCell (cell)
+            newState
+        | _ -> currentState
+
+    let changeFromContextMenu storedState = getChangedState (storedState)
+
+    match currentState with
+    | Startup -> changeFromStartup ()
+    | Waiting -> changeFromWaiting ()
+    | Selected (cell, eid) -> changeFromSelected (cell, eid)
+    | NewRound -> changeFromNewRound ()
+    | Moving (currentEid, currentPath) -> changeFromMoving (currentEid, currentPath)
+    | Attacking _ -> changeStateFromAttacking ()
+    | ContextMenu storedState -> changeFromContextMenu storedState newState
+
+let ChangeState newState (container: Container) =
+    let currentState =
+        container.LoadResource<GameState> "State"
+
+    let changedState =
+        getChangedState container currentState newState
+
+    let worldNode =
+        GodotObject.InstanceFromId(container.LoadResource<uint64>("WorldNode")) :?> Node2D
+
     worldNode.QueueRedraw()
 
 

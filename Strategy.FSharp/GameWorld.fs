@@ -22,6 +22,7 @@ type Draw =
     end
 
 
+
 let CreateGrid radius =
 
     let CreateCube (q, r) = Hexagon.NewAxial q r
@@ -193,7 +194,36 @@ type GameWorld() =
                         ChangeState Waiting world
                         let position = world.Get(eid).Get<UnitPosition>()
                         world.AddResource<Option<Hexagon>>("CursorCell", Some(position.Position))
-                        world.Send({ Button = Button.Select})
+                        world.Send({ Button = Button.Select })
+                | Attacking (attacker, attacked) ->
+                    let attackerEntity = world.Get(attacker)
+                    let attackedEntity = world.Get(attacked)
+                    let attackerUnit = attackerEntity.Get<Unit>()
+                    let attackedUnit = attackedEntity.Get<Unit>()
+
+                    let damage = attackerUnit.Damage - attackedUnit.Armor
+                    let remainingIntegrity = attackedUnit.Integrity - damage
+
+                    attackedEntity.Set(
+                        { attackedUnit with
+                              Integrity = remainingIntegrity }
+                    )
+
+                    attackerEntity.Set(
+                        { attackerUnit with
+                              RemainingAttacks = attackerUnit.RemainingAttacks - 1 }
+                    )
+
+                    if remainingIntegrity <= 0 then
+                        let unitNode =
+                            GodotObject.InstanceFromId(attackedEntity.Get<Node>().NodeId) :?> UnitNode
+
+                        unitNode.Destroy()
+                        world.Destroy(attacked)
+
+                    let attackerPosition = attackerEntity.Get<UnitPosition>()
+
+                    ChangeState(GameState.Selected(attackerPosition.Position, Some(attacker))) world
                 | _ -> ()
 
 
@@ -332,9 +362,6 @@ type GameWorld() =
         let state = world.LoadResource<GameState>("State")
 
         match state with
-        | Startup
-        | NewRound
-        | Waiting -> ()
         | Selected (hexagon, _) ->
             let unitEntity =
                 getEntitiesAtHexagon (hexagon, world)
@@ -375,5 +402,4 @@ type GameWorld() =
                                     let toPosition = cell.Get2DPosition
                                     this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
                                     currentCell <- cell
-        | Moving _
-        | ContextMenu -> ()
+        | _ -> ()

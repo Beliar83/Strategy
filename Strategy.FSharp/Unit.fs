@@ -64,6 +64,8 @@ type UnitNode() =
         let body = this.GetNode(bodyNode) :?> Body
         body.SetWeaponRotation(rotation)
 
+    member this.Destroy() = this.QueueFree()
+
 module UnitSystem =
 
     let registerUpdateUnitNodes (c: Container) =
