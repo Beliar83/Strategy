@@ -71,13 +71,12 @@ type MapUI() =
                     | Item -> contextMenu.AddItem(item.Label, index))
 
             contextMenu.ResetSize()
-
-            let event =
+            let idPressed =
                 contextMenu.ToSignal(contextMenu, "id_pressed")
 
-            event.OnCompleted
+            idPressed.OnCompleted
                 (fun () ->
-                    let result = event.GetResult()
+                    let result = idPressed.GetResult()
                     let index = result[0].AsInt32()
 
                     if index >= 0 then
@@ -86,6 +85,17 @@ type MapUI() =
                     else
                         closed ())
 
+            let popupHide = contextMenu.ToSignal(contextMenu, "popup_hide")
+            popupHide.OnCompleted(
+                fun () ->                    
+                    let checkResult() =
+                        if not <| idPressed.IsCompleted then
+                            closed()
+                    
+                    Async.StartWithContinuations(Async.Sleep 100, checkResult, (fun _ -> checkResult()), (fun _ -> checkResult()))
+                    
+                )
+            
             contextMenu.Position <- position
             contextMenu.Popup()
 
