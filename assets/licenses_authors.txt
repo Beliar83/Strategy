@@ -1,2 +1,0 @@
-units/tank.png - Combination of sprites from 2d-battle-tanks of CraftPix.net (https://opengameart.org/content/2d-battle-tanks) - License: OGA-BY 3.0 (https://static.opengameart.org/OGA-BY-3.0.txt)
-icons/simpleBlock.png - Beliar83 - No license (yet)

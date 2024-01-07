@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d2sbpjwjj54p1"
-path="res://.godot/imported/Hull_01_Mask.png-49bc0f5a7d3f2c15fa7b2df21f655642.ctex"
+uid="uid://bs0hasp3p84vv"
+path="res://.godot/imported/Artillery_Foot_Left_01_Mask.png-7c641e18419e96a2bf0dc2551748bc97.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/units/Hull_01_Mask.png"
-dest_files=["res://.godot/imported/Hull_01_Mask.png-49bc0f5a7d3f2c15fa7b2df21f655642.ctex"]
+source_file="res://assets/units/Artillery_Foot_Left_01_Mask.png"
+dest_files=["res://.godot/imported/Artillery_Foot_Left_01_Mask.png-7c641e18419e96a2bf0dc2551748bc97.ctex"]
 
 [params]
 

@@ -60,6 +60,9 @@ type Unit =
       RemainingRange: int32
       RemainingAttacks: int32 }
 
+type Tank = struct end
+type Artillery = struct end
+
 let rec getChangedState (container: Container) currentState newState =
     let getChangedState = getChangedState container
 

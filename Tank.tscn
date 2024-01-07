@@ -1,26 +1,25 @@
-[gd_scene load_steps=12 format=3 uid="uid://cjiwmaboqhwen"]
+[gd_scene load_steps=11 format=3 uid="uid://cjiwmaboqhwen"]
 
 [ext_resource type="Script" path="res://Unit.cs" id="1"]
-[ext_resource type="Texture2D" uid="uid://bvftq2m403qix" path="res://assets/units/Hull_01_NoColor.png" id="2_p7vnf"]
+[ext_resource type="Texture2D" uid="uid://siaiq2s5iytt" path="res://assets/units/Body01_Mask.png" id="3_43llf"]
 [ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="3_b1r4v"]
-[ext_resource type="Texture2D" uid="uid://d2sbpjwjj54p1" path="res://assets/units/Hull_01_Mask.png" id="3_vbjhi"]
+[ext_resource type="Texture2D" uid="uid://cxkfmq5butxc5" path="res://assets/units/Body01.png" id="4_rnu2w"]
 [ext_resource type="Script" path="res://Body.cs" id="5_lhfhs"]
-[ext_resource type="Texture2D" uid="uid://c8mkifvvb474o" path="res://assets/units/Gun_01_NoColor.png" id="6_2r3h7"]
-[ext_resource type="Texture2D" uid="uid://dp7gnsbbd7acf" path="res://assets/units/Gun_01_Mask.png" id="6_rkj3g"]
 [ext_resource type="Shader" path="res://assets/shaders/unit_colorizer.gdshader" id="6_tatij"]
-[ext_resource type="Texture2D" uid="uid://b6ux8vqrltg1w" path="res://assets/units/Track_1_A.png" id="8_df0hv"]
+[ext_resource type="Texture2D" uid="uid://ba6yurgp3y8v1" path="res://assets/units/Gun_0a_Mask.png" id="6_v7d6c"]
+[ext_resource type="Texture2D" uid="uid://byxtfmuylkpfu" path="res://assets/units/Gun_01.png" id="7_s68id"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_l6242"]
 shader = ExtResource("6_tatij")
 shader_parameter/color = Color(1, 0, 0, 1)
-shader_parameter/mask = ExtResource("3_vbjhi")
+shader_parameter/mask = ExtResource("3_43llf")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_otfse"]
 shader = ExtResource("6_tatij")
 shader_parameter/color = Color(1, 0, 0, 1)
-shader_parameter/mask = ExtResource("6_rkj3g")
+shader_parameter/mask = ExtResource("6_v7d6c")
 
-[node name="Unit" type="Area2D"]
+[node name="Tanks" type="Area2D"]
 collision_layer = 2
 script = ExtResource("1")
 BodyNode = NodePath("Body")
@@ -29,30 +28,26 @@ BodyNode = NodePath("Body")
 z_index = 1
 z_as_relative = false
 material = SubResource("ShaderMaterial_l6242")
-position = Vector2(0, -1)
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("2_p7vnf")
+scale = Vector2(0.125, 0.125)
+texture = ExtResource("4_rnu2w")
 script = ExtResource("5_lhfhs")
+NodesWithColor = Array[NodePath]([NodePath("."), NodePath("Weapon")])
 
 [node name="Weapon" type="Sprite2D" parent="Body"]
 z_index = 2
 z_as_relative = false
 material = SubResource("ShaderMaterial_otfse")
-position = Vector2(0, 45)
-texture = ExtResource("6_2r3h7")
-offset = Vector2(0, -45)
+position = Vector2(-5, 5)
+texture = ExtResource("7_s68id")
+offset = Vector2(5, -85)
 
 [node name="LeftTracks" type="Sprite2D" parent="Body"]
 z_as_relative = false
 position = Vector2(-75, 5)
-scale = Vector2(1, 1)
-texture = ExtResource("8_df0hv")
 
 [node name="RightTracks" type="Sprite2D" parent="Body"]
 z_as_relative = false
 position = Vector2(75, 5)
-scale = Vector2(1, 1)
-texture = ExtResource("8_df0hv")
 
 [node name="Outline" type="Line2D" parent="."]
 visible = false
@@ -72,4 +67,3 @@ clip_text = true
 max_lines_visible = 1
 
 [node name="CollisionPolygon2D" parent="." instance=ExtResource("3_b1r4v")]
-visible = false

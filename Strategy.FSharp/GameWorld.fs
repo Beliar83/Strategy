@@ -208,7 +208,10 @@ type GameWorld() =
                     let angle = direction.Angle()
                     let angle = Mathf.RadToDeg(angle) + 90.0f // The calculated angle is off by 90° from what we need
                     
-                    attackerEntity.Set({ attackerPosition with WeaponRotation = angle })
+                    if attackerEntity.Has<Artillery>() then                    
+                        attackerEntity.Set({ attackerPosition with BodyRotation = angle; WeaponRotation = angle })
+                    else
+                        attackerEntity.Set({ attackerPosition with WeaponRotation = angle })
 
                     attackedEntity.Set(
                         { attackedUnit with
@@ -244,6 +247,7 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 1 }
             )
+            .With(Tank())
             .With(
                 { Position = Hexagon.NewAxial -1 -1
                   BodyRotation = 90.0f
@@ -251,7 +255,7 @@ type GameWorld() =
             )
             .With({ PlayerId = "Player1" })
         |> ignore
-
+        
         world
             .Create()
             .With(
@@ -264,6 +268,7 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 1 }
             )
+            .With(Tank())
             .With(
                 { Position = Hexagon.NewAxial -1 1
                   BodyRotation = 90.0f
@@ -275,6 +280,49 @@ type GameWorld() =
         world
             .Create()
             .With(
+                { Integrity = 5
+                  Damage = 4
+                  MaxAttackRange = 5
+                  MinAttackRange = 3
+                  Armor = 1
+                  Mobility = 0
+                  RemainingRange = 0
+                  RemainingAttacks = 1 }
+            )
+            .With(Artillery())
+            .With(
+                { Position = Hexagon.NewAxial -2 -2
+                  BodyRotation = 90.0f
+                  WeaponRotation = 90.0f }
+            )
+            .With({ PlayerId = "Player1" })
+        |> ignore
+
+        world
+            .Create()
+            .With(
+                { Integrity = 5
+                  Damage = 4
+                  MaxAttackRange = 5
+                  MinAttackRange = 3
+                  Armor = 1
+                  Mobility = 0
+                  RemainingRange = 0
+                  RemainingAttacks = 1 }
+            )
+            .With(Artillery())
+            .With(
+                { Position = Hexagon.NewAxial -3 0
+                  BodyRotation = 90.0f
+                  WeaponRotation = 90.0f }
+            )
+            .With({ PlayerId = "Player1" })
+        |> ignore
+                
+        
+        world
+            .Create()
+            .With(
                 { Integrity = 10
                   Damage = 2
                   MaxAttackRange = 3
@@ -284,6 +332,7 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 0 }
             )
+            .With(Tank())
             .With(
                 { Position = Hexagon.NewAxial 1 -1
                   BodyRotation = 270.0f
@@ -291,6 +340,27 @@ type GameWorld() =
             )
             .With({ PlayerId = "Player2" })
         |> ignore
+        
+        world
+            .Create()
+            .With(
+                { Integrity = 10
+                  Damage = 2
+                  MaxAttackRange = 3
+                  MinAttackRange = 1
+                  Armor = 1
+                  Mobility = 3
+                  RemainingRange = 3
+                  RemainingAttacks = 0 }
+            )
+            .With(Tank())
+            .With(
+                { Position = Hexagon.NewAxial 1 0
+                  BodyRotation = 270.0f
+                  WeaponRotation = 270.0f }
+            )
+            .With({ PlayerId = "Player2" })
+        |> ignore        
 
         world
             .Create()
@@ -304,13 +374,14 @@ type GameWorld() =
                   RemainingRange = 3
                   RemainingAttacks = 0 }
             )
+            .With(Tank())
             .With(
                 { Position = Hexagon.NewAxial 1 1
                   BodyRotation = 270.0f
                   WeaponRotation = 270.0f }
             )
             .With({ PlayerId = "Player2" })
-        |> ignore
+        |> ignore  
 
         // First state needs to be set directly
         world.AddResource("State", GameState.NewRound)

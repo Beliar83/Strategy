@@ -218,7 +218,13 @@ module HexMapSystem =
                                 player.PlayerId = entityPlayer.PlayerId
                             else
                                 false
-    let canAttackCellFromCell (cellNodes : Map<Hexagon,uint64>) (unit : Unit) (unitNode : Node2D) (selectedCellPlayer : Player) (currentPlayerId : string) (container: Container) (attackFrom : Hexagon) (toAttack : Hexagon) =
+    let canAttackCellFromCell (unitEntityId : Eid) (container: Container) (attackFrom : Hexagon) (toAttack : Hexagon) =
+        let cellNodes = container.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+        let currentPlayerId = container.LoadResource<string>("CurrentPlayer")
+        let unitEntity = container.Get(unitEntityId)
+        let unitNode = GodotObject.InstanceFromId(unitEntity.Get<Node>().NodeId) :?> Node2D
+        let unit = unitEntity.Get<Unit>()
+        let selectedCellPlayer = unitEntity.Get<Player.Player>()
         let distanceToUnit = toAttack.DistanceTo(attackFrom)
         let doesSelectedUnitBelongToCurrentPlayer = selectedCellPlayer.PlayerId = currentPlayerId
         if doesSelectedUnitBelongToCurrentPlayer then
@@ -238,30 +244,33 @@ module HexMapSystem =
                             false
                     )
             if not <| isTargetSamePlayer then
-                let selfPosition = attackFrom.Get2DPosition
-                let cellPosition = toAttack.Get2DPosition
-                let mapSize = container.LoadResource<int>("MapRadius")
-                
-                let adjustmentVector = Vector2((mapSize |> float32) / 8.0f, (mapSize |> float32 ) / 8.0f)
-                let queryParameters = new PhysicsRayQueryParameters2D()
-                queryParameters.From <- selfPosition + adjustmentVector
-                queryParameters.To <- cellPosition
-                queryParameters.CollisionMask <- 1u <<< UNIT_BIT
-                queryParameters.CollideWithAreas <- true
-                queryParameters.HitFromInside <- false
-                let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
-                if result.Count = 0 then
+                if unitEntity.Has<Artillery>() then
                     true
                 else
-                    queryParameters.From <- selfPosition - adjustmentVector
+                    let selfPosition = attackFrom.Get2DPosition
+                    let cellPosition = toAttack.Get2DPosition
+                    let mapSize = container.LoadResource<int>("MapRadius")
+                    
+                    let adjustmentVector = Vector2((mapSize |> float32) / 8.0f, (mapSize |> float32 ) / 8.0f)
+                    let queryParameters = new PhysicsRayQueryParameters2D()
+                    queryParameters.From <- selfPosition + adjustmentVector
+                    queryParameters.To <- cellPosition
+                    queryParameters.CollisionMask <- 1u <<< UNIT_BIT
+                    queryParameters.CollideWithAreas <- true
+                    queryParameters.HitFromInside <- false
                     let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
-                    if (result.Count = 0) then
+                    if result.Count = 0 then
                         true
                     else
-                        let hitId = result["collider_id"].AsUInt64()
-                        let hitNode = GodotObject.InstanceFromId(hitId) :?> Node2D
-                        let hitHexagon = Hexagon.At2DPosition(hitNode.Position)
-                        hitHexagon = toAttack
+                        queryParameters.From <- selfPosition - adjustmentVector
+                        let result = unitNode.GetWorld2D().DirectSpaceState.IntersectRay(queryParameters)
+                        if (result.Count = 0) then
+                            true
+                        else
+                            let hitId = result["collider_id"].AsUInt64()
+                            let hitNode = GodotObject.InstanceFromId(hitId) :?> Node2D
+                            let hitHexagon = Hexagon.At2DPosition(hitNode.Position)
+                            hitHexagon = toAttack
             else
                 false
         else
@@ -287,16 +296,10 @@ module HexMapSystem =
                     match eidOption with
                     | None -> ()
                     | Some eid ->                        
-                        let entity = c.Get eid
-                        let unit = entity.Get<Unit>()
-                        let selectedCellPlayer = entity.Get<Player.Player>()
-                        let unitNode = GodotObject.InstanceFromId(entity.Get<Node>().NodeId) :?> Node2D
-                        let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
+                        let canAttack = canAttackCellFromCell eid c hexagon
                         let cells = c.LoadResource<array<Hexagon>> "Cells"
-                        let currentPlayerId = c.LoadResource<string>("CurrentPlayer")
-                        let canAttack = canAttackCellFromCell cellNodes unit unitNode selectedCellPlayer currentPlayerId c hexagon
+                        let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
                         for cell in cells do
-                            
                             if canAttack cell then
                                 emitHighlightAttackable cell cellNodes |> ignore
                 | _ -> ()
@@ -386,13 +389,8 @@ module HexMapSystem =
                                     match targetEntity with
                                     | None -> ()
                                     | Some targetEntity ->                                    
-                                        let unit = entity.Get<Unit>()
-                                        let selectedCellPlayer = entity.Get<Player.Player>()
-                                        let unitNode = GodotObject.InstanceFromId(entity.Get<Node>().NodeId) :?> Node2D
-                                        let cellNodes = c.LoadResource<Map<Hexagon,uint64>> "CellNodes"
-                                        let currentPlayerId = c.LoadResource<string>("CurrentPlayer")
 
-                                        if canAttackCellFromCell cellNodes unit unitNode selectedCellPlayer currentPlayerId c unitPosition.Position cell then
+                                        if canAttackCellFromCell entity.Id c unitPosition.Position cell then
                                             { Label = "Attack"; Command = (fun() -> attackCommand(entity.Id, targetEntity.Id)); ItemType = ItemType.IconItem("res://assets/icons/attack.png") }
                                         else
                                             ()

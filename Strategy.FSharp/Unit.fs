@@ -46,15 +46,12 @@ type UnitNode() =
         and set value = bodyNode <- value
 
     member this.SetColor(color: Color) =
-        let body = this.GetNode(bodyNode) :?> CanvasItem
-        let material = body.Material :?> ShaderMaterial
-        material.SetShaderParameter("color", GodotColorFromColor(color))
-
-        let weapon =
-            body.GetNode(new NodePath("Weapon")) :?> CanvasItem
-
-        let material = weapon.Material :?> ShaderMaterial
-        material.SetShaderParameter("color", GodotColorFromColor(color))
+        let body = this.GetNode(bodyNode) :?> Body
+        
+        for node in body.NodesWithColor do
+            let node = body.GetNode(node) :?> Node2D        
+            let material = node.Material :?> ShaderMaterial
+            material.SetShaderParameter("color", GodotColorFromColor(color))
 
     member this.SetBodyRotation(rotation: float32) =
         let body = this.GetNode(bodyNode) :?> Body
@@ -87,7 +84,10 @@ module UnitSystem =
 
                 if not <| entity.Has<Node>() then
                     let node =
-                        GD.Load "res://Unit.tscn" :?> PackedScene
+                        if entity.Has<Artillery>() then
+                            GD.Load "res://Artillery.tscn" :?> PackedScene
+                        else
+                            GD.Load "res://Tank.tscn" :?> PackedScene
 
                     let node = node.Instantiate() :?> UnitNode
                     entity.Add { NodeId = node.GetInstanceId() }

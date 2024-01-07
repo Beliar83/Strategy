@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c8mkifvvb474o"
-path="res://.godot/imported/Gun_01_NoColor.png-a7af28ee08166d30019209d7826be5c0.ctex"
+uid="uid://bqaqddfkrkp34"
+path="res://.godot/imported/Artillery_Foot_Right_01_Mask.png-144ee6fca931e967fe3c4ac5bcfe9dc5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/units/Gun_01_NoColor.png"
-dest_files=["res://.godot/imported/Gun_01_NoColor.png-a7af28ee08166d30019209d7826be5c0.ctex"]
+source_file="res://assets/units/Artillery_Foot_Right_01_Mask.png"
+dest_files=["res://.godot/imported/Artillery_Foot_Right_01_Mask.png-144ee6fca931e967fe3c4ac5bcfe9dc5.ctex"]
 
 [params]
 
