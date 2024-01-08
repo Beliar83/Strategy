@@ -204,9 +204,8 @@ type GameWorld() =
                     let remainingIntegrity = attackedUnit.Integrity - damage
                     let attackerPosition = attackerEntity.Get<UnitPosition>()
                     let attackedPosition = attackedEntity.Get<UnitPosition>()
-                    let direction = attackerPosition.Position.Get2DPosition.DirectionTo(attackedPosition.Position.Get2DPosition) 
-                    let angle = direction.Angle()
-                    let angle = Mathf.RadToDeg(angle) + 90.0f // The calculated angle is off by 90° from what we need
+                    
+                    let angle = getAngleBetweenPositions(attackerPosition.Position, attackedPosition.Position)
                     
                     if attackerEntity.Has<Artillery>() then                    
                         attackerEntity.Set({ attackerPosition with BodyRotation = angle; WeaponRotation = angle })

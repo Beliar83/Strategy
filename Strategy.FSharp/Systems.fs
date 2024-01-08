@@ -63,6 +63,11 @@ type Unit =
 type Tank = struct end
 type Artillery = struct end
 
+let getAngleBetweenPositions (first : Hexagon, second: Hexagon) =
+    let direction = first.Get2DPosition.DirectionTo(second.Get2DPosition) 
+    let angle = direction.Angle()
+    Mathf.RadToDeg(angle) + 90.0f // The calculated angle is off by 90° from what we need
+
 let rec getChangedState (container: Container) currentState newState =
     let getChangedState = getChangedState container
 

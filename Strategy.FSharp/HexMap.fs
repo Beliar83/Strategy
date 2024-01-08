@@ -245,7 +245,9 @@ module HexMapSystem =
                     )
             if not <| isTargetSamePlayer then
                 if unitEntity.Has<Artillery>() then
-                    true
+                    let angle = getAngleBetweenPositions(attackFrom, toAttack)
+                    let currentRotation = unitEntity.Get<UnitPosition>().BodyRotation
+                    Mathf.Abs(angle - currentRotation) <= 30.0f
                 else
                     let selfPosition = attackFrom.Get2DPosition
                     let cellPosition = toAttack.Get2DPosition
