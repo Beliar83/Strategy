@@ -10,17 +10,17 @@
 [ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="9_18dic"]
 [ext_resource type="Texture2D" uid="uid://bqaqddfkrkp34" path="res://assets/units/Artillery_Foot_Right_01_Mask.png" id="9_ku38p"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_otfse"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_xo8rk"]
 shader = ExtResource("2_n17db")
 shader_parameter/color = Color(1, 0, 0, 1)
 shader_parameter/mask = ExtResource("4_7cr5g")
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_t5dqc"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_jtwwl"]
 shader = ExtResource("2_n17db")
 shader_parameter/color = Color(1, 0, 0, 1)
 shader_parameter/mask = ExtResource("6_lqpxf")
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_jvf0m"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_4tblo"]
 shader = ExtResource("2_n17db")
 shader_parameter/color = Color(1, 0, 0, 1)
 shader_parameter/mask = ExtResource("9_ku38p")
@@ -52,12 +52,12 @@ visible = false
 
 [node name="Body" type="Node2D" parent="."]
 script = ExtResource("5_o4jdn")
-NodesWithColor = Array[NodePath]([NodePath("Weapon"), NodePath("LeftFoot"), NodePath("RightFoot")])
+NodesWithColor = [NodePath("Weapon"), NodePath("LeftFoot"), NodePath("RightFoot")]
 
 [node name="Weapon" type="Sprite2D" parent="Body"]
 z_index = 2
 z_as_relative = false
-material = SubResource("ShaderMaterial_otfse")
+material = SubResource("ShaderMaterial_xo8rk")
 position = Vector2(-0.625, 0.625)
 scale = Vector2(0.125, 0.125)
 texture = ExtResource("5_tbwwf")
@@ -66,14 +66,14 @@ offset = Vector2(5, -85)
 [node name="LeftFoot" type="Sprite2D" parent="Body"]
 z_index = 1
 z_as_relative = false
-material = SubResource("ShaderMaterial_t5dqc")
+material = SubResource("ShaderMaterial_jtwwl")
 position = Vector2(-10, 12)
 scale = Vector2(0.125, 0.125)
 texture = ExtResource("7_sh14m")
 
 [node name="RightFoot" type="Sprite2D" parent="Body"]
 z_as_relative = false
-material = SubResource("ShaderMaterial_jvf0m")
+material = SubResource("ShaderMaterial_4tblo")
 position = Vector2(10, 12)
 scale = Vector2(0.125, 0.125)
 texture = ExtResource("7_sh14m")

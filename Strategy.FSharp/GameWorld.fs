@@ -20,24 +20,15 @@ type Draw =
 
     end
 
+let setComponent(entity: Entity<int,Eid,EidSegmentKeyMapper>, comp : Object) =    
+    let has = entity.GetType().GetMethod("Has").MakeGenericMethod(comp.GetType())
+    let setComponent = 
+        if has.Invoke(entity, null) :?> bool then
+            entity.GetType().GetMethod("Set").MakeGenericMethod(comp.GetType())
+        else
+            entity.GetType().GetMethod("Add").MakeGenericMethod(comp.GetType())
+    setComponent.Invoke(entity, [|comp|]) |> ignore
 
-
-let CreateGrid radius =
-
-    let CreateCube (q, r) = Hexagon.NewAxial q r
-
-    let InRadius (hexagon: Hexagon) =
-        (hexagon.DistanceTo Hexagon.Zero) < radius
-
-    let hexagons =
-        let array = [| -radius .. radius + 1 |]
-
-        array
-        |> Array.collect (fun r -> array |> Array.map (fun s -> (r, s)))
-        |> Array.map CreateCube
-        |> Array.filter InRadius
-
-    hexagons
 
 type GameWorld() =
     inherit Node2D()
@@ -45,11 +36,13 @@ type GameWorld() =
     let mutable physicsUpdate = Unchecked.defaultof<_>
     let mutable frameUpdate = Unchecked.defaultof<_>
     let playerQueue = Queue<string>()
-
     let mutable mapUI: NodePath = null
 
     let mutable camera: NodePath = null
-
+    let mutable map : NodePath = null
+    
+    let mutable entities : Map<Eid, List<Object>> = Map.empty
+    
     member this.MapUI
         with get () = mapUI
         and set value = mapUI <- value
@@ -57,10 +50,65 @@ type GameWorld() =
     member this.Camera
         with get () = camera
         and set value = camera <- value
+    
+    member this.Map
+        with get() = map
+        and set value =
+            let gameState : GameState = GameState.Startup
+            if world.TryGetResource<GameState>("State", ref gameState) then
+                let map = this.GetNode(value) :?> HexMap
+                map.World <- Some(world)
+                
+            map <- value
 
+    member this.GetEntities() =
+        entities
+    
+    member this.AddEntity() =
+        let entity = world.Create()
+        
+        entities <- Map.add entity.Id List.empty entities
+        entity.Id
+    
+    member this.RemoveEntity(entity: Eid) =
+        world.Destroy(entity)
+        entities <- Map.remove entity entities  
+
+        
+    member this.SetComponents(entity: Eid, components : List<Object>) =
+        let entity = world.Get(entity)
+        let mutable componentsToRemove = entities[entity.Id]
+        
+        // Reflection, but this should only be called in the editor, or once every map load,
+        // and Garnet needs the generic methods to correctly store components.
+        for comp in components do
+            componentsToRemove <- componentsToRemove |> List.filter (fun c -> not <| c.Equals comp)
+                
+            setComponent(entity, comp)
+            
+        for comp in componentsToRemove do
+            let remove = entity.GetType().GetMethod("Remove").MakeGenericMethod(comp.GetType())
+            remove.Invoke(entity, null) |> ignore
+            
+        entities <- Map.add entity.Id components entities
+        
+    member this.SetComponent(entity: Eid, comp : Object) =
+        let entity = world.Get(entity)
+        setComponent(entity, comp)
+    
+    member this.Players
+        with get () =        
+            world.LoadResource<Map<string, PlayerData>>("Players")
+        and set (value : Map<string, PlayerData>) =
+            world.AddResource("Players", value)
+        
+    
     override this._Ready() =
-        world.AddResource("MapRadius", 5)
-        world.AddResource("UpdateMap", true)
+        if not <| (map = null) then
+            let map = this.GetNode(map) :?> HexMap
+            map.World <- Some(world)
+                
+        world.AddResource("UpdateMap", false)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("FieldsNeedUpdate", false)
         world.AddResource("CurrentPlayer", "Player1")
@@ -76,12 +124,6 @@ type GameWorld() =
             new NodePath("Units") |> this.GetNode :?> Node2D
 
         world.AddResource("UnitsNode", unitsNode.GetInstanceId())
-
-        let players =
-            Map [ "Player1", { Color = ColorFromGodotColor(Colors.Red) }
-                  "Player2", { Color = ColorFromGodotColor(Colors.Blue) } ]
-
-        world.AddResource("Players", players)
 
         let mapUI = this.GetNode(mapUI) :?> MapUI
         world.AddResource("UINode", mapUI.GetInstanceId())
@@ -117,16 +159,6 @@ type GameWorld() =
         physicsUpdate <-
             world.On<PhysicsUpdate>
             <| fun _ ->
-                let updateMap = world.LoadResource<bool>("UpdateMap")
-
-                if updateMap then
-                    let mapRadius = world.LoadResource<int>("MapRadius")
-
-                    world.AddResource("Cells", CreateGrid mapRadius)
-                    world.Send(CellsUpdated())
-
-                    world.AddResource("UpdateMap", false)
-
                 let state = world.LoadResource<GameState> "State"
 
                 match state with
@@ -230,164 +262,22 @@ type GameWorld() =
                         world.Destroy(attacked)
 
                     ChangeState(GameState.Selected(attackerPosition.Position, Some(attacker))) world
+                | Startup ->
+                    let players =
+                        world.LoadResource<Map<String, PlayerData>> "Players"
+                    if players.Count >= 1 then
+                        ChangeState(GameState.NewRound) world                        
+
                 | _ -> ()
 
-
-
-        world
-            .Create()
-            .With(
-                { Integrity = 10
-                  Damage = 2
-                  MaxAttackRange = 3
-                  MinAttackRange = 1
-                  Armor = 1
-                  Mobility = 3
-                  RemainingRange = 3
-                  RemainingAttacks = 1 }
-            )
-            .With(Tank())
-            .With(
-                { Position = Hexagon.NewAxial -1 -1
-                  BodyRotation = 90.0f
-                  WeaponRotation = 90.0f }
-            )
-            .With({ PlayerId = "Player1" })
-        |> ignore
-        
-        world
-            .Create()
-            .With(
-                { Integrity = 10
-                  Damage = 2
-                  MaxAttackRange = 3
-                  MinAttackRange = 1
-                  Armor = 1
-                  Mobility = 3
-                  RemainingRange = 3
-                  RemainingAttacks = 1 }
-            )
-            .With(Tank())
-            .With(
-                { Position = Hexagon.NewAxial -1 1
-                  BodyRotation = 90.0f
-                  WeaponRotation = 90.0f }
-            )
-            .With({ PlayerId = "Player1" })
-        |> ignore
-
-        world
-            .Create()
-            .With(
-                { Integrity = 5
-                  Damage = 4
-                  MaxAttackRange = 5
-                  MinAttackRange = 3
-                  Armor = 1
-                  Mobility = 0
-                  RemainingRange = 0
-                  RemainingAttacks = 1 }
-            )
-            .With(Artillery())
-            .With(
-                { Position = Hexagon.NewAxial -2 -2
-                  BodyRotation = 90.0f
-                  WeaponRotation = 90.0f }
-            )
-            .With({ PlayerId = "Player1" })
-        |> ignore
-
-        world
-            .Create()
-            .With(
-                { Integrity = 5
-                  Damage = 4
-                  MaxAttackRange = 5
-                  MinAttackRange = 3
-                  Armor = 1
-                  Mobility = 0
-                  RemainingRange = 0
-                  RemainingAttacks = 1 }
-            )
-            .With(Artillery())
-            .With(
-                { Position = Hexagon.NewAxial -3 0
-                  BodyRotation = 90.0f
-                  WeaponRotation = 90.0f }
-            )
-            .With({ PlayerId = "Player1" })
-        |> ignore
-                
-        
-        world
-            .Create()
-            .With(
-                { Integrity = 10
-                  Damage = 2
-                  MaxAttackRange = 3
-                  MinAttackRange = 1
-                  Armor = 1
-                  Mobility = 3
-                  RemainingRange = 3
-                  RemainingAttacks = 0 }
-            )
-            .With(Tank())
-            .With(
-                { Position = Hexagon.NewAxial 1 -1
-                  BodyRotation = 270.0f
-                  WeaponRotation = 270.0f }
-            )
-            .With({ PlayerId = "Player2" })
-        |> ignore
-        
-        world
-            .Create()
-            .With(
-                { Integrity = 10
-                  Damage = 2
-                  MaxAttackRange = 3
-                  MinAttackRange = 1
-                  Armor = 1
-                  Mobility = 3
-                  RemainingRange = 3
-                  RemainingAttacks = 0 }
-            )
-            .With(Tank())
-            .With(
-                { Position = Hexagon.NewAxial 1 0
-                  BodyRotation = 270.0f
-                  WeaponRotation = 270.0f }
-            )
-            .With({ PlayerId = "Player2" })
-        |> ignore        
-
-        world
-            .Create()
-            .With(
-                { Integrity = 10
-                  Damage = 2
-                  MaxAttackRange = 3
-                  MinAttackRange = 1
-                  Armor = 1
-                  Mobility = 3
-                  RemainingRange = 3
-                  RemainingAttacks = 0 }
-            )
-            .With(Tank())
-            .With(
-                { Position = Hexagon.NewAxial 1 1
-                  BodyRotation = 270.0f
-                  WeaponRotation = 270.0f }
-            )
-            .With({ PlayerId = "Player2" })
-        |> ignore  
-
         // First state needs to be set directly
-        world.AddResource("State", GameState.NewRound)
+        world.AddResource("State", GameState.Startup)
 
     override this._Process(delta) = world.Run <| { FrameDelta = delta }
 
-    override this._PhysicsProcess(delta) = world.Run <| { PhysicsDelta = delta }
+    override this._PhysicsProcess(delta) =
+        if not <| Engine.Singleton.IsEditorHint() then            
+            world.Run <| { PhysicsDelta = delta }
 
     override this._UnhandledInput(event) =
         let handleCursorMouseMotion (event: InputEventMouseMotion) =

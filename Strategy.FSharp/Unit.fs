@@ -66,7 +66,7 @@ type UnitNode() =
 module UnitSystem =
 
     let registerUpdateUnitNodes (c: Container) =
-        c.On<PhysicsUpdate>
+        c.On<FrameUpdate>
         <| fun _ ->
             let unitsNode = c.LoadResource<uint64>("UnitsNode")
 
@@ -76,30 +76,46 @@ module UnitSystem =
             let players =
                 c.LoadResource<Map<string, PlayerData>>("Players")
 
+            for entity in c.Query<Eid, Node>() do
+                let id = entity.Value1
+                let node = entity.Value2
+                let entity = c.Get id
+                
+                if not <| (entity.Has<Unit>() && entity.Has<UnitPosition>() && (entity.Has<Tank>() || entity.Has<Artillery>())) then
+                    let node = GodotObject.InstanceFromId(node.NodeId) :?> Node2D
+                    node.QueueFree()
+                    entity.Remove<Node>()
+            
             for entity in c.Query<Eid, Unit, UnitPosition>() do
                 let id = entity.Value1
                 let cell = entity.Value3.Position
 
                 let entity = c.Get id
 
-                if not <| entity.Has<Node>() then
-                    let node =
-                        if entity.Has<Artillery>() then
-                            GD.Load "res://Artillery.tscn" :?> PackedScene
-                        else
-                            GD.Load "res://Tank.tscn" :?> PackedScene
+                let node =
+                    if not <| entity.Has<Node>() then
+                        let node =
+                            if entity.Has<Artillery>() then
+                                GD.Load "res://Artillery.tscn" :?> PackedScene
+                            else
+                                GD.Load "res://Tank.tscn" :?> PackedScene
 
-                    let node = node.Instantiate() :?> UnitNode
-                    entity.Add { NodeId = node.GetInstanceId() }
-                    node.Position <- cell.Get2DPosition
+                        let node = node.Instantiate() :?> UnitNode
+                        entity.Add { NodeId = node.GetInstanceId() }
+                        node.Position <- cell.Get2DPosition
 
-                    if entity.Has<Player>() then
-                        let player = entity.Get<Player>()
-                        node.SetColor(players[player.PlayerId].Color)
+                        unitsNode.AddChild node
+                        entity.Add { NodeId = node.GetInstanceId() }
+                        node
+                    else
+                        let node = entity.Get<Node>()
+                        GodotObject.InstanceFromId(node.NodeId) :?> UnitNode
 
-                    unitsNode.AddChild node
-                    entity.Add { NodeId = node.GetInstanceId() }
+                if entity.Has<Player>() then
+                    let player = entity.Get<Player>()
+                    node.SetColor(players[player.PlayerId].Color)
 
+            
             for entity in c.Query<Eid, Unit, Node, UnitPosition>() do
                 let id = entity.Value1
                 let unit = entity.Value2
