@@ -47,9 +47,9 @@ type UnitNode() =
 
     member this.SetColor(color: Color) =
         let body = this.GetNode(bodyNode) :?> Body
-        
+
         for node in body.NodesWithColor do
-            let node = body.GetNode(node) :?> Node2D        
+            let node = body.GetNode(node) :?> Node2D
             let material = node.Material :?> ShaderMaterial
             material.SetShaderParameter("color", GodotColorFromColor(color))
 
@@ -80,12 +80,17 @@ module UnitSystem =
                 let id = entity.Value1
                 let node = entity.Value2
                 let entity = c.Get id
-                
-                if not <| (entity.Has<Unit>() && entity.Has<UnitPosition>() && (entity.Has<Tank>() || entity.Has<Artillery>())) then
-                    let node = GodotObject.InstanceFromId(node.NodeId) :?> Node2D
+
+                if not
+                   <| (entity.Has<Unit>()
+                       && entity.Has<UnitPosition>()
+                       && (entity.Has<Tank>() || entity.Has<Artillery>())) then
+                    let node =
+                        GodotObject.InstanceFromId(node.NodeId) :?> Node2D
+
                     node.QueueFree()
                     entity.Remove<Node>()
-            
+
             for entity in c.Query<Eid, Unit, UnitPosition>() do
                 let id = entity.Value1
                 let cell = entity.Value3.Position
@@ -113,9 +118,11 @@ module UnitSystem =
 
                 if entity.Has<Player>() then
                     let player = entity.Get<Player>()
-                    node.SetColor(players[player.PlayerId].Color)
 
-            
+                    if not <| (player.PlayerId = "") then
+                        node.SetColor(players[player.PlayerId].Color)
+
+
             for entity in c.Query<Eid, Unit, Node, UnitPosition>() do
                 let id = entity.Value1
                 let unit = entity.Value2

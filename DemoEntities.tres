@@ -1,0 +1,200 @@
+[gd_resource type="Resource" script_class="EntityContainer" load_steps=45 format=3 uid="uid://dxkla20vi7d4h"]
+
+[ext_resource type="Script" path="res://Components/Tank.cs" id="1_c0pn5"]
+[ext_resource type="Script" path="res://Hexagon.cs" id="2_8xa6t"]
+[ext_resource type="Script" path="res://Components/UnitPosition.cs" id="3_4egvo"]
+[ext_resource type="Script" path="res://Components/Unit.cs" id="4_pxakk"]
+[ext_resource type="Script" path="res://Components/Player.cs" id="5_o8vei"]
+[ext_resource type="Script" path="res://Entity.cs" id="6_jsbno"]
+[ext_resource type="Script" path="res://EntityContainer.cs" id="7_f5ki3"]
+[ext_resource type="Script" path="res://Components/Artillery.cs" id="7_qltty"]
+
+[sub_resource type="Resource" id="Resource_n3urq"]
+script = ExtResource("1_c0pn5")
+
+[sub_resource type="Resource" id="Resource_g8o8a"]
+script = ExtResource("2_8xa6t")
+Q = -3
+R = 0
+
+[sub_resource type="Resource" id="Resource_4rom7"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_g8o8a")
+BodyRotation = 90.0
+WeaponRotation = 90.0
+
+[sub_resource type="Resource" id="Resource_jgker"]
+script = ExtResource("4_pxakk")
+Integrity = 10
+Damage = 3
+MaxAttackRange = 2
+MinAttackRange = 1
+Armor = 1
+Mobility = 3
+
+[sub_resource type="Resource" id="Resource_m7h33"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 0"
+
+[sub_resource type="Resource" id="Resource_3igx0"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_n3urq"), SubResource("Resource_4rom7"), SubResource("Resource_jgker"), SubResource("Resource_m7h33")]
+
+[sub_resource type="Resource" id="Resource_nry2b"]
+script = ExtResource("1_c0pn5")
+
+[sub_resource type="Resource" id="Resource_s7mx6"]
+script = ExtResource("2_8xa6t")
+Q = -3
+R = 1
+
+[sub_resource type="Resource" id="Resource_5hrfc"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_s7mx6")
+BodyRotation = 90.0
+WeaponRotation = 90.0
+
+[sub_resource type="Resource" id="Resource_hrrki"]
+script = ExtResource("4_pxakk")
+Integrity = 10
+Damage = 3
+MaxAttackRange = 2
+MinAttackRange = 1
+Armor = 1
+Mobility = 3
+
+[sub_resource type="Resource" id="Resource_efgfn"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 0"
+
+[sub_resource type="Resource" id="Resource_g2h80"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_nry2b"), SubResource("Resource_5hrfc"), SubResource("Resource_hrrki"), SubResource("Resource_efgfn")]
+
+[sub_resource type="Resource" id="Resource_f82dv"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 1"
+
+[sub_resource type="Resource" id="Resource_l8q2a"]
+script = ExtResource("1_c0pn5")
+
+[sub_resource type="Resource" id="Resource_pasfj"]
+script = ExtResource("2_8xa6t")
+Q = 1
+R = 1
+
+[sub_resource type="Resource" id="Resource_ryeqp"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_pasfj")
+BodyRotation = 270.0
+WeaponRotation = 270.0
+
+[sub_resource type="Resource" id="Resource_hnpyf"]
+script = ExtResource("4_pxakk")
+Integrity = 10
+Damage = 4
+MaxAttackRange = 2
+MinAttackRange = 1
+Armor = 2
+Mobility = 2
+
+[sub_resource type="Resource" id="Resource_4eyn0"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_f82dv"), SubResource("Resource_l8q2a"), SubResource("Resource_ryeqp"), SubResource("Resource_hnpyf")]
+
+[sub_resource type="Resource" id="Resource_nabpp"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 1"
+
+[sub_resource type="Resource" id="Resource_whoh0"]
+script = ExtResource("1_c0pn5")
+
+[sub_resource type="Resource" id="Resource_23fq3"]
+script = ExtResource("2_8xa6t")
+Q = 2
+R = -1
+
+[sub_resource type="Resource" id="Resource_t1qsg"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_23fq3")
+BodyRotation = 270.0
+WeaponRotation = 270.0
+
+[sub_resource type="Resource" id="Resource_fpuqb"]
+script = ExtResource("4_pxakk")
+Integrity = 10
+Damage = 4
+MaxAttackRange = 2
+MinAttackRange = 1
+Armor = 2
+Mobility = 2
+
+[sub_resource type="Resource" id="Resource_vexqa"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_nabpp"), SubResource("Resource_whoh0"), SubResource("Resource_t1qsg"), SubResource("Resource_fpuqb")]
+
+[sub_resource type="Resource" id="Resource_oxil5"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 0"
+
+[sub_resource type="Resource" id="Resource_3uhct"]
+script = ExtResource("1_c0pn5")
+
+[sub_resource type="Resource" id="Resource_2h23k"]
+script = ExtResource("2_8xa6t")
+Q = -2
+R = -1
+
+[sub_resource type="Resource" id="Resource_wka2h"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_2h23k")
+BodyRotation = 90.0
+WeaponRotation = 90.0
+
+[sub_resource type="Resource" id="Resource_8imju"]
+script = ExtResource("4_pxakk")
+Integrity = 10
+Damage = 3
+MaxAttackRange = 2
+MinAttackRange = 1
+Armor = 1
+Mobility = 3
+
+[sub_resource type="Resource" id="Resource_ny25p"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_oxil5"), SubResource("Resource_3uhct"), SubResource("Resource_wka2h"), SubResource("Resource_8imju")]
+
+[sub_resource type="Resource" id="Resource_poiop"]
+script = ExtResource("5_o8vei")
+PlayerId = "Player 0"
+
+[sub_resource type="Resource" id="Resource_3exqn"]
+script = ExtResource("7_qltty")
+
+[sub_resource type="Resource" id="Resource_y7r4s"]
+script = ExtResource("2_8xa6t")
+Q = -4
+R = 0
+
+[sub_resource type="Resource" id="Resource_mihxw"]
+script = ExtResource("3_4egvo")
+Hexagon = SubResource("Resource_y7r4s")
+BodyRotation = 90.0
+WeaponRotation = 90.0
+
+[sub_resource type="Resource" id="Resource_hci5t"]
+script = ExtResource("4_pxakk")
+Integrity = 5
+Damage = 4
+MaxAttackRange = 6
+MinAttackRange = 3
+Armor = 0
+Mobility = 0
+
+[sub_resource type="Resource" id="Resource_uidwi"]
+script = ExtResource("6_jsbno")
+Components = [SubResource("Resource_poiop"), SubResource("Resource_3exqn"), SubResource("Resource_mihxw"), SubResource("Resource_hci5t")]
+
+[resource]
+script = ExtResource("7_f5ki3")
+Entities = [SubResource("Resource_3igx0"), SubResource("Resource_g2h80"), SubResource("Resource_4eyn0"), SubResource("Resource_vexqa"), SubResource("Resource_ny25p"), SubResource("Resource_uidwi")]

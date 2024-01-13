@@ -9,7 +9,7 @@ public partial class PlayerData : Resource
 {
     private Color color = new(0, 0, 0);
     private StringName name = "Player";
-    
+
     public GameWorld? GameWorld { get; set; }
 
     [Export]
@@ -26,19 +26,13 @@ public partial class PlayerData : Resource
                     GameWorld?.PlayerChanged();
                 }
             }
-        } 
-    } 
-    
+        }
+    }
+
     [Export(PropertyHint.ColorNoAlpha)]
     public Color Color
     {
         get => color;
-        set
-        {
-            if (Engine.IsEditorHint())
-            {
-                color = value;
-            }
-        }
+        set => color = value;
     }
 }

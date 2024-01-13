@@ -60,11 +60,22 @@ type Unit =
       RemainingRange: int32
       RemainingAttacks: int32 }
 
-type Tank = struct end
-type Artillery = struct end
+type Tank =
+    struct
 
-let getAngleBetweenPositions (first : Hexagon, second: Hexagon) =
-    let direction = first.Get2DPosition.DirectionTo(second.Get2DPosition) 
+    end
+
+
+type Artillery =
+    struct
+
+    end
+
+
+let getAngleBetweenPositions (first: Hexagon, second: Hexagon) =
+    let direction =
+        first.Get2DPosition.DirectionTo(second.Get2DPosition)
+
     let angle = direction.Angle()
     Mathf.RadToDeg(angle) + 90.0f // The calculated angle is off by 90° from what we need
 
@@ -93,7 +104,9 @@ let rec getChangedState (container: Container) currentState newState =
 
     let changeFromStartup () =
         match newState with
-        | NewRound -> newState
+        | NewRound ->
+            resetUnits ()
+            newState
         | _ -> currentState
 
     let changeFromWaiting () =
@@ -102,7 +115,7 @@ let rec getChangedState (container: Container) currentState newState =
         | ContextMenu _
         | Waiting -> newState
         | Selected (cell, _) ->
-            selectCell (cell)
+            selectCell cell
             newState
         | Moving _
         | Attacking _ -> currentState
@@ -113,11 +126,11 @@ let rec getChangedState (container: Container) currentState newState =
     let changeFromSelected (cell, eid) =
         match newState with
         | Startup ->
-            deselectCell (cell)
+            deselectCell cell
             currentState
         | NewRound ->
             resetUnits ()
-            deselectCell (cell)
+            deselectCell cell
             newState
         | Attacking (attacker, _) ->
             match eid with
@@ -128,10 +141,10 @@ let rec getChangedState (container: Container) currentState newState =
                 else
                     currentState
         | Selected (cell, _) ->
-            selectCell (cell)
+            selectCell cell
             newState
         | _ ->
-            deselectCell (cell)
+            deselectCell cell
             newState
 
     let changeFromNewRound () =
@@ -159,11 +172,11 @@ let rec getChangedState (container: Container) currentState newState =
         | ContextMenu _ -> newState
         | Waiting -> newState
         | Selected (cell, _) ->
-            selectCell (cell)
+            selectCell cell
             newState
         | _ -> currentState
 
-    let changeFromContextMenu storedState = getChangedState (storedState)
+    let changeFromContextMenu storedState = getChangedState storedState
 
     match currentState with
     | Startup -> changeFromStartup ()

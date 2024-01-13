@@ -20,14 +20,28 @@ type Draw =
 
     end
 
-let setComponent(entity: Entity<int,Eid,EidSegmentKeyMapper>, comp : Object) =    
-    let has = entity.GetType().GetMethod("Has").MakeGenericMethod(comp.GetType())
-    let setComponent = 
+
+
+let setComponent (entity: Entity<int, Eid, EidSegmentKeyMapper>, comp: Object) =
+    let has =
+        entity
+            .GetType()
+            .GetMethod("Has")
+            .MakeGenericMethod(comp.GetType())
+
+    let setComponent =
         if has.Invoke(entity, null) :?> bool then
-            entity.GetType().GetMethod("Set").MakeGenericMethod(comp.GetType())
+            entity
+                .GetType()
+                .GetMethod("Set")
+                .MakeGenericMethod(comp.GetType())
         else
-            entity.GetType().GetMethod("Add").MakeGenericMethod(comp.GetType())
-    setComponent.Invoke(entity, [|comp|]) |> ignore
+            entity
+                .GetType()
+                .GetMethod("Add")
+                .MakeGenericMethod(comp.GetType())
+
+    setComponent.Invoke(entity, [| comp |]) |> ignore
 
 
 type GameWorld() =
@@ -39,10 +53,10 @@ type GameWorld() =
     let mutable mapUI: NodePath = null
 
     let mutable camera: NodePath = null
-    let mutable map : NodePath = null
-    
-    let mutable entities : Map<Eid, List<Object>> = Map.empty
-    
+    let mutable map: NodePath = null
+
+    let mutable entities: Map<Eid, List<Object>> = Map.empty
+
     member this.MapUI
         with get () = mapUI
         and set value = mapUI <- value
@@ -50,64 +64,77 @@ type GameWorld() =
     member this.Camera
         with get () = camera
         and set value = camera <- value
-    
+
     member this.Map
-        with get() = map
+        with get () = map
         and set value =
-            let gameState : GameState = GameState.Startup
+            let gameState: GameState = GameState.Startup
+
             if world.TryGetResource<GameState>("State", ref gameState) then
                 let map = this.GetNode(value) :?> HexMap
                 map.World <- Some(world)
-                
+
             map <- value
 
-    member this.GetEntities() =
-        entities
-    
+    member this.GetEntities() = entities
+
     member this.AddEntity() =
         let entity = world.Create()
-        
+
         entities <- Map.add entity.Id List.empty entities
         entity.Id
-    
-    member this.RemoveEntity(entity: Eid) =
-        world.Destroy(entity)
-        entities <- Map.remove entity entities  
 
-        
-    member this.SetComponents(entity: Eid, components : List<Object>) =
+    member this.RemoveEntity(entity: Eid) =
+        let entity = world.Get(entity)
+
+        if entity.Has<Node>() then
+            let node =
+                GodotObject.InstanceFromId(entity.Get<Node>().NodeId) :?> Node2D
+
+            node.QueueFree()
+
+        world.Destroy(entity.Id)
+        entities <- Map.remove entity.Id entities
+
+
+    member this.SetComponents(entity: Eid, components: List<Object>) =
         let entity = world.Get(entity)
         let mutable componentsToRemove = entities[entity.Id]
-        
+
         // Reflection, but this should only be called in the editor, or once every map load,
         // and Garnet needs the generic methods to correctly store components.
         for comp in components do
-            componentsToRemove <- componentsToRemove |> List.filter (fun c -> not <| c.Equals comp)
-                
-            setComponent(entity, comp)
-            
+            componentsToRemove <-
+                componentsToRemove
+                |> List.filter (fun c -> not <| c.Equals comp)
+
+            setComponent (entity, comp)
+
         for comp in componentsToRemove do
-            let remove = entity.GetType().GetMethod("Remove").MakeGenericMethod(comp.GetType())
+            let remove =
+                entity
+                    .GetType()
+                    .GetMethod("Remove")
+                    .MakeGenericMethod(comp.GetType())
+
             remove.Invoke(entity, null) |> ignore
-            
+
         entities <- Map.add entity.Id components entities
-        
-    member this.SetComponent(entity: Eid, comp : Object) =
+
+    member this.SetComponent(entity: Eid, comp: Object) =
         let entity = world.Get(entity)
-        setComponent(entity, comp)
-    
+        setComponent (entity, comp)
+
     member this.Players
-        with get () =        
-            world.LoadResource<Map<string, PlayerData>>("Players")
-        and set (value : Map<string, PlayerData>) =
-            world.AddResource("Players", value)
-        
-    
+        with get () = world.LoadResource<Map<string, PlayerData>>("Players")
+        and set (value: Map<string, PlayerData>) = world.AddResource("Players", value)
+
+
     override this._Ready() =
         if not <| (map = null) then
             let map = this.GetNode(map) :?> HexMap
             map.World <- Some(world)
-                
+
         world.AddResource("UpdateMap", false)
         world.AddResource("CursorPosition", Vector2.Zero)
         world.AddResource("FieldsNeedUpdate", false)
@@ -236,13 +263,21 @@ type GameWorld() =
                     let remainingIntegrity = attackedUnit.Integrity - damage
                     let attackerPosition = attackerEntity.Get<UnitPosition>()
                     let attackedPosition = attackedEntity.Get<UnitPosition>()
-                    
-                    let angle = getAngleBetweenPositions(attackerPosition.Position, attackedPosition.Position)
-                    
-                    if attackerEntity.Has<Artillery>() then                    
-                        attackerEntity.Set({ attackerPosition with BodyRotation = angle; WeaponRotation = angle })
+
+                    let angle =
+                        getAngleBetweenPositions (attackerPosition.Position, attackedPosition.Position)
+
+                    if attackerEntity.Has<Artillery>() then
+                        attackerEntity.Set(
+                            { attackerPosition with
+                                  BodyRotation = angle
+                                  WeaponRotation = angle }
+                        )
                     else
-                        attackerEntity.Set({ attackerPosition with WeaponRotation = angle })
+                        attackerEntity.Set(
+                            { attackerPosition with
+                                  WeaponRotation = angle }
+                        )
 
                     attackedEntity.Set(
                         { attackedUnit with
@@ -265,8 +300,9 @@ type GameWorld() =
                 | Startup ->
                     let players =
                         world.LoadResource<Map<String, PlayerData>> "Players"
+
                     if players.Count >= 1 then
-                        ChangeState(GameState.NewRound) world                        
+                        ChangeState(GameState.NewRound) world
 
                 | _ -> ()
 
@@ -276,7 +312,7 @@ type GameWorld() =
     override this._Process(delta) = world.Run <| { FrameDelta = delta }
 
     override this._PhysicsProcess(delta) =
-        if not <| Engine.Singleton.IsEditorHint() then            
+        if not <| Engine.Singleton.IsEditorHint() then
             world.Run <| { PhysicsDelta = delta }
 
     override this._UnhandledInput(event) =
@@ -323,47 +359,48 @@ type GameWorld() =
         | _ -> ()
 
     override this._Draw() =
-        let state = world.LoadResource<GameState>("State")
+        if this.IsNodeReady() then
+            let state = world.LoadResource<GameState>("State")
 
-        match state with
-        | Selected (hexagon, _) ->
-            let unitEntity =
-                getEntitiesAtHexagon (hexagon, world)
-                |> Array.map world.Get
-                |> Array.choose
-                    (fun entity ->
-                        if entity.Has<Unit>() && entity.Has<Player>() then
-                            Some(entity)
-                        else
-                            None)
-                |> Array.tryHead
+            match state with
+            | Selected (hexagon, _) ->
+                let unitEntity =
+                    getEntitiesAtHexagon (hexagon, world)
+                    |> Array.map world.Get
+                    |> Array.choose
+                        (fun entity ->
+                            if entity.Has<Unit>() && entity.Has<Player>() then
+                                Some(entity)
+                            else
+                                None)
+                    |> Array.tryHead
 
-            match unitEntity with
-            | None -> ()
-            | Some unitEntity ->
-                let currentPlayer =
-                    world.LoadResource<string>("CurrentPlayer")
+                match unitEntity with
+                | None -> ()
+                | Some unitEntity ->
+                    let currentPlayer =
+                        world.LoadResource<string>("CurrentPlayer")
 
-                let unitPlayer = unitEntity.Get<Player>()
+                    let unitPlayer = unitEntity.Get<Player>()
 
-                if unitPlayer.PlayerId = currentPlayer then
-                    let unit = unitEntity.Get<Unit>()
+                    if unitPlayer.PlayerId = currentPlayer then
+                        let unit = unitEntity.Get<Unit>()
 
-                    let cell =
-                        world.LoadResource<Option<Hexagon>>("CursorCell")
+                        let cell =
+                            world.LoadResource<Option<Hexagon>>("CursorCell")
 
-                    match cell with
-                    | None -> ()
-                    | Some cell ->
-                        let path = findPath (hexagon, cell, world)
+                        match cell with
+                        | None -> ()
+                        | Some cell ->
+                            let path = findPath (hexagon, cell, world)
 
-                        if path.Length <= unit.RemainingRange then
-                            let mutable currentCell = hexagon
+                            if path.Length <= unit.RemainingRange then
+                                let mutable currentCell = hexagon
 
-                            if path.Length > 0 then
-                                for cell in path do
-                                    let fromPosition = currentCell.Get2DPosition
-                                    let toPosition = cell.Get2DPosition
-                                    this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
-                                    currentCell <- cell
-        | _ -> ()
+                                if path.Length > 0 then
+                                    for cell in path do
+                                        let fromPosition = currentCell.Get2DPosition
+                                        let toPosition = cell.Get2DPosition
+                                        this.DrawDashedLine(fromPosition, toPosition, Colors.Black, 2.0f)
+                                        currentCell <- cell
+            | _ -> ()

@@ -19,7 +19,14 @@ public partial class Entity : Resource
         get => gameWorld;
         set
         {
+            if (Id.IsDefined)
+            {
+                gameWorld?.RemoveEntity(Id);
+            }
+
             gameWorld = value;
+            Id = gameWorld?.AddEntity() ?? Eid.Undefined;
+
             SyncComponents();
         }
     }

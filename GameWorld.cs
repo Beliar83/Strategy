@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Garnet.Composition;
 using Godot;
 using Godot.Collections;
 using Microsoft.FSharp.Collections;
@@ -12,15 +11,30 @@ namespace Strategy;
 [Tool]
 public partial class GameWorld : FSharp.GameWorld.GameWorld
 {
-    private static readonly StringName EntitiesName = new("Entities");
+    private static readonly StringName EntityContainerName = new("EntityContainer");
 
-    private Array<Entity> entities = new();
+    private EntityContainer entityContainer;
+
+    [Export(PropertyHint.ResourceType, "EntityContainer")]
+    public EntityContainer EntityContainer
+    {
+        get => entityContainer;
+        set
+        {
+            value.GameWorld = this;
+            if (Engine.IsEditorHint())
+            {
+                entityContainer = value;
+            }
+        }
+    }
 
     private Array<PlayerData> players = new();
 
     public GameWorld()
     {
         SyncPlayers(new List<Tuple<string, Player.PlayerData>>());
+        entityContainer = new EntityContainer { GameWorld = this };
     }
 
     /// <inheritdoc />
@@ -35,7 +49,7 @@ public partial class GameWorld : FSharp.GameWorld.GameWorld
         base._Process(delta);
         if (Engine.Singleton.IsEditorHint())
         {
-            foreach (Entity entity in entities)
+            foreach (Entity entity in entityContainer.GetEntities())
             {
                 SetComponents(entity.Id,
                     ListModule.OfSeq(entity.Components.Where(c => c is not null).Select(c => c.GetValue())
@@ -60,84 +74,6 @@ public partial class GameWorld : FSharp.GameWorld.GameWorld
     public override void _Draw()
     {
         base._Draw();
-    }
-
-    /// <inheritdoc />
-    public override Variant _Get(StringName property)
-    {
-        return property == EntitiesName ? entities : base._Get(property);
-    }
-
-    /// <inheritdoc />
-    public override bool _Set(StringName property, Variant value)
-    {
-        if (property == EntitiesName)
-        {
-            List<Entity?> entitiesValue = value.AsGodotArray<Entity?>().ToList();
-            FSharpMap<Eid, FSharpList<object>> internalEntities = GetEntities();
-
-            if (internalEntities.Count == 0)
-            {
-                foreach (Entity entity in entitiesValue.Where(e => e is not null).Cast<Entity>())
-                {
-                    entity.Id = Eid.Undefined;
-                }
-            }
-
-            var entitiesToDelete = new HashSet<Eid>(internalEntities.Keys);
-
-            // Needed as godot creates items as null
-            var actualArray = new Array<Entity>();
-
-            foreach (Entity? entity in entitiesValue)
-            {
-                Entity actualEntity;
-                if (entity?.Id.IsDefined ?? false)
-                {
-                    entitiesToDelete.Remove(entity.Id);
-                    actualEntity = entity;
-                }
-                else
-                {
-                    actualEntity = entity ?? new Entity();
-                    actualEntity.Id = AddEntity();
-                    actualEntity.GameWorld = this;
-                }
-
-                actualArray.Add(actualEntity);
-
-                SetComponents(actualEntity.Id,
-                    ListModule.OfSeq(actualEntity.Components.Select(c => c.GetValue()).Where(v => v is not null)));
-            }
-
-            foreach (Eid entity in entitiesToDelete)
-            {
-                RemoveEntity(entity);
-            }
-
-            if (Engine.IsEditorHint())
-            {
-                entities = actualArray;
-            }
-
-            return true;
-        }
-
-        return base._Set(property, value);
-    }
-
-    /// <inheritdoc />
-    public override Array<Dictionary> _GetPropertyList()
-    {
-        Array<Dictionary> properties = base._GetPropertyList() ?? new Array<Dictionary>();
-        var propertyData = new Dictionary();
-        propertyData["name"] = EntitiesName;
-        propertyData["type"] = (int)Variant.Type.Array;
-        propertyData["usage"] = (int)PropertyUsageFlags.Default;
-        propertyData["hint"] = (int)PropertyHint.ResourceType;
-        propertyData["hint_string"] = "Entity";
-        properties.Add(propertyData);
-        return properties;
     }
 
     [Export((PropertyHint)35, "MarginContainer")]
