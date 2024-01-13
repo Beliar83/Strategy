@@ -444,7 +444,13 @@ module HexMapSystem =
                                 let unit = entity.Get<Unit>()
                                 let unitPosition = entity.Get<UnitPosition>()
                                 let path = findPath(unitPosition.Position, cell, c)
-                                if IsInMovementRange(unit, path.Length) then
+                                let currentPlayerId = c.LoadResource<string>("CurrentPlayer")
+                                let isOwnedByCurrentPlayer =
+                                    if entity.Has<Player>() then
+                                        entity.Get<Player>().PlayerId = currentPlayerId
+                                    else
+                                        false
+                                if isOwnedByCurrentPlayer && IsInMovementRange(unit, path.Length) then
                                     { Label = "Move"; Command = (fun () -> moveCommand(entity.Id, path)); ItemType = ItemType.IconItem("res://assets/icons/move.png") }
                                 else
                                     let targetEntity =
