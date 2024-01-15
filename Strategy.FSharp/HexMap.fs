@@ -288,7 +288,7 @@ module HexMapSystem =
                 let canArtilleryAttack() =
                     let angle = getAngleBetweenPositions(attackFrom, toAttack)
                     let currentRotation = unitEntity.Get<UnitPosition>().BodyRotation
-                    Mathf.Abs(angle - currentRotation) <= 30.0f
+                    Mathf.Abs(angle - currentRotation) <= 31.0f // Number chosen to adjust for cells that would be slightly out of range, but look like they should be attackable
                     
                 let canTankAttack() =
                     let selfPosition = attackFrom.Get2DPosition
