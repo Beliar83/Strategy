@@ -1,0 +1,3 @@
+[submodule "GeonBit.UI"]
+	path = GeonBit.UI
+	url = https://github.com/RonenNess/GeonBit.UI.git

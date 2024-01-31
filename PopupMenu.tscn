@@ -1,5 +1,0 @@
-[gd_scene format=3 uid="uid://gsoqgkferkmj"]
-
-[node name="PopupMenu" type="PopupMenu"]
-hide_on_state_item_selection = true
-allow_search = false

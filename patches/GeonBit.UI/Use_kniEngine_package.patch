@@ -1,0 +1,76 @@
+Subject: [PATCH] Use kniEngine package
+---
+Index: GeonBit.UI/Source/Resources.cs
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/GeonBit.UI/Source/Resources.cs b/GeonBit.UI/Source/Resources.cs
+--- a/GeonBit.UI/Source/Resources.cs	(revision 9720c26f235caec669ad2f71978d950a931b7117)
++++ b/GeonBit.UI/Source/Resources.cs	(date 1706974356829)
+@@ -451,26 +451,30 @@
+         private T LoadXml<T>(string name) where T : new()
+         {
+             // try to load xml directly from full path
+-            string fullPath = Path.Combine(_content.RootDirectory, name + ".xml");
+-            if (File.Exists(fullPath))
++            string fullPath = Path.Combine(_content.RootDirectory, $"{name}.xml");
++            try
+             {
+-                XmlSerializer serializer = new XmlSerializer(typeof(T));
+-                using (var reader = File.OpenText(fullPath))
++                var serializer = new XmlSerializer(typeof(T));
++                using var reader = new StreamReader(TitleContainer.OpenStream(fullPath));
++                var eventsHandler = new XmlDeserializationEvents
+                 {
+-                    XmlDeserializationEvents eventsHandler = new XmlDeserializationEvents()
+-                    {
+-                        OnUnknownAttribute = (object sender, XmlAttributeEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid attribute '" + e.Attr.Name + "' at line " + e.LineNumber); },
+-                        OnUnknownElement = (object sender, XmlElementEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid element '" + e.Element.Name + "' at line " + e.LineNumber); },
+-                        OnUnknownNode = (object sender, XmlNodeEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': invalid element '" + e.Name + "' at line " + e.LineNumber); },
+-                        OnUnreferencedObject = (object sender, UnreferencedObjectEventArgs e) => { throw new Exception("Error parsing file '" + fullPath + "': unreferenced object '" + e.UnreferencedObject.ToString() + "'"); },
+-                    };
+-                    return (T)serializer.Deserialize(System.Xml.XmlReader.Create(reader), eventsHandler);
+-                }
++                    OnUnknownAttribute = (_, e) => throw new Exception(
++                        $"Error parsing file '{fullPath}': invalid attribute '{e.Attr.Name}' at line {e.LineNumber}"),
++                    OnUnknownElement = (_, e) => throw new Exception(
++                        $"Error parsing file '{fullPath}': invalid element '{e.Element.Name}' at line {e.LineNumber}"),
++                    OnUnknownNode = (_, e) => throw new Exception(
++                        $"Error parsing file '{fullPath}': invalid element '{e.Name}' at line {e.LineNumber}"),
++                    OnUnreferencedObject = (_, e) => throw new Exception(
++                        $"Error parsing file '{fullPath}': unreferenced object '{e.UnreferencedObject}'"),
++                };
++                return (T)serializer.Deserialize(System.Xml.XmlReader.Create(reader), eventsHandler);
+             }
+-
+-            // if xml file not found, try to load xnb instead
+-            var ret = _content.Load<T>(name);
+-            return ret;
++            catch (FileNotFoundException)
++            {
++                // if xml file not found, try to load xnb instead
++                var ret = _content.Load<T>(name);
++                return ret;
++            }
+         }
+ 
+         /// <summary>
+Index: GeonBit.UI/GeonBit.UI.csproj
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/GeonBit.UI/GeonBit.UI.csproj b/GeonBit.UI/GeonBit.UI.csproj
+--- a/GeonBit.UI/GeonBit.UI.csproj	(revision 9720c26f235caec669ad2f71978d950a931b7117)
++++ b/GeonBit.UI/GeonBit.UI.csproj	(date 1706955974179)
+@@ -19,8 +19,7 @@
+     <EmbeddedResource Include="Icon.bmp" />
+   </ItemGroup>
+   <ItemGroup>
+-    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.1.303" />
+-    <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.1.303" />
++    <PackageReference Include="nkast.Xna.Framework.Ref" Version="3.10.9001" />
+     <PackageReference Include="System.Runtime" Version="4.3.1" />
+   </ItemGroup>
+   <Target Name="RestoreDotnetTools" BeforeTargets="Restore">
