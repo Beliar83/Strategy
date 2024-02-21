@@ -1,17 +1,29 @@
+using System.Linq;
 using Godot;
 using Godot.Collections;
 
-namespace Strategy
+namespace Strategy;
+
+[Tool]
+[GlobalClass]
+public partial class HexMap : Node2D
 {
-	[Tool]
-	[GlobalClass]
-	public partial class HexMap : FSharp.HexMap.HexMap
+	private int cellSize;
+	
+	[Export(PropertyHint.ResourceType, "HexagonMapType")]
+	public HexagonMapType? MapType { get; set; }
+	
+	[Export]
+	public int CellSize
 	{
-		[Export]
-		public new int MapRadius
+		get => cellSize;
+		set
 		{
-			get => base.MapRadius;
-			set => base.MapRadius = value;
+			cellSize = value;
+			foreach (HexagonNode2D hexagonNode2D in GetChildren().OfType<HexagonNode2D>())
+			{
+				hexagonNode2D.UpdatePosition();
+			}
 		}
 	}
 }

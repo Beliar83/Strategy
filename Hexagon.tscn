@@ -1,9 +1,10 @@
 [gd_scene load_steps=2 format=3 uid="uid://xspls1ya1gif"]
 
-[ext_resource type="Script" path="res://Hexagon.gd" id="1_df6bx"]
+[ext_resource type="Script" path="res://HexagonCell.cs" id="1_8goa5"]
 
 [node name="Cell" type="Node2D"]
-script = ExtResource("1_df6bx")
+script = ExtResource("1_8goa5")
+TileScale = Vector2(1e-05, 1e-05)
 
 [node name="Hexagon" type="Node2D" parent="."]
 scale = Vector2(4, 4)
@@ -31,11 +32,5 @@ visible = false
 color = Color(1, 1, 1, 0.12549)
 polygon = PackedVector2Array(-8.66025, -5, 0, -10, 8.66025, -5, 8.66025, 5, 0, 10, -8.66025, 5, -8.66025, -5)
 
-[connection signal="cursor_entered" from="." to="." method="_on_cursor_entered"]
-[connection signal="cursor_exited" from="." to="." method="_on_cursor_exited"]
-[connection signal="deselected" from="." to="." method="_on_deselected"]
-[connection signal="highlight_attackable" from="." to="." method="_on_highlight_attackable"]
-[connection signal="highlight_movable" from="." to="." method="_on_highlight_movable"]
-[connection signal="selected" from="." to="." method="_on_selected"]
-[connection signal="unhighlight_attackable" from="." to="." method="_on_unhighlight_attackable"]
-[connection signal="unhighlight_movable" from="." to="." method="_on_unhighlight_movable"]
+[node name="Tile" type="Sprite2D" parent="."]
+scale = Vector2(1e-05, 1e-05)

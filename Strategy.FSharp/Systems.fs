@@ -15,11 +15,6 @@ type FrameUpdate = { FrameDelta: float }
 [<Struct>]
 type Position = { X: float32; Y: float32 }
 
-type UnitPosition =
-    { Position: Hexagon
-      BodyRotation: float32
-      WeaponRotation: float32 }
-
 type GameState =
     | Startup
     | NewRound
@@ -58,7 +53,10 @@ type Unit =
       Armor: int32
       Mobility: int32
       RemainingRange: int32
-      RemainingAttacks: int32 }
+      RemainingAttacks: int32
+      Position: Hexagon
+      BodyRotation: float32
+      WeaponRotation: float32 }
 
 type Tank =
     struct

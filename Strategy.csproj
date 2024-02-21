@@ -5,8 +5,9 @@
         <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'ios' ">net8.0</TargetFramework>
         <EnableDynamicLoading>true</EnableDynamicLoading>
         <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
     </PropertyGroup>
     <ItemGroup>
-        <ProjectReference Include="Strategy.FSharp\Strategy.FSharp.fsproj"/>
+<!--        <ProjectReference Include="Strategy.FSharp\Strategy.FSharp.fsproj"/>-->
     </ItemGroup>
 </Project>

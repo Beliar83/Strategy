@@ -1,9 +1,7 @@
-[gd_scene load_steps=14 format=3 uid="uid://dljm44tcrl1x7"]
+[gd_scene load_steps=12 format=3 uid="uid://dljm44tcrl1x7"]
 
-[ext_resource type="Script" path="res://Unit.cs" id="1_8b5jl"]
 [ext_resource type="Shader" path="res://assets/shaders/unit_colorizer.gdshader" id="2_n17db"]
 [ext_resource type="Texture2D" uid="uid://dvrtycolciinx" path="res://assets/units/Artillery_Gun_01_Mask.png" id="4_7cr5g"]
-[ext_resource type="Script" path="res://Body.cs" id="5_o4jdn"]
 [ext_resource type="Texture2D" uid="uid://co6ed43hkab5f" path="res://assets/units/Artillery_Gun_01.png" id="5_tbwwf"]
 [ext_resource type="Texture2D" uid="uid://bs0hasp3p84vv" path="res://assets/units/Artillery_Foot_Left_01_Mask.png" id="6_lqpxf"]
 [ext_resource type="Texture2D" uid="uid://dwiqns0qo126t" path="res://assets/units/Artillery_Foot_Left_01.png" id="8_n7xtc"]
@@ -28,8 +26,6 @@ shader_parameter/mask = ExtResource("9_ku38p")
 
 [node name="Artillery" type="Area2D"]
 collision_layer = 2
-script = ExtResource("1_8b5jl")
-BodyNode = NodePath("Body")
 
 [node name="Outline" type="Line2D" parent="."]
 visible = false
@@ -52,8 +48,6 @@ max_lines_visible = 1
 visible = false
 
 [node name="Body" type="Node2D" parent="."]
-script = ExtResource("5_o4jdn")
-NodesWithColor = [NodePath("Weapon"), NodePath("LeftFoot"), NodePath("RightFoot")]
 
 [node name="Weapon" type="Sprite2D" parent="Body"]
 z_index = 2
