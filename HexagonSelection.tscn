@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://dvp78rdoobjik"]
+
+[node name="Cell" type="Node2D"]
+
+[node name="Outline" type="Line2D" parent="."]
+z_index = 1
+scale = Vector2(4, 4)
+points = PackedVector2Array(-16, 0, -8, -16, 8, -16, 16, 0.5, 8, 16, -8, 16, -16, 0)
+width = 0.5
+default_color = Color(0, 0, 0, 1)
+joint_mode = 1
+begin_cap_mode = 2
+
+[node name="Hexagon" type="Polygon2D" parent="."]
+scale = Vector2(4, 4)
+color = Color(1, 1, 1, 0.125)
+polygon = PackedVector2Array(-16, 0, -8, -16, 8, -16, 16, 0, 8, 16, -8, 16, -16, 0)

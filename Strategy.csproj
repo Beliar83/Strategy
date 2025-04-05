@@ -1,12 +1,9 @@
-<Project Sdk="Godot.NET.Sdk/4.2.1">
-    <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
-        <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net7.0</TargetFramework>
-        <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'ios' ">net8.0</TargetFramework>
-        <EnableDynamicLoading>true</EnableDynamicLoading>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
-    <ItemGroup>
-        <ProjectReference Include="Strategy.FSharp\Strategy.FSharp.fsproj"/>
-    </ItemGroup>
+<Project Sdk="Godot.NET.Sdk/4.4.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <WarningsAsErrors>Nullable</WarningsAsErrors>
+  </PropertyGroup>
 </Project>

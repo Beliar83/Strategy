@@ -1,0 +1,15 @@
+﻿https://cruizrf.itch.io/25-top-down-tanks-artillery (NonFree!)
+  units/Artillery*
+  units/Body*
+  units/Gun*
+
+https://opengameart.org/content/2d-battle-tanks
+  icons/tank.png 
+
+https://opengameart.org/content/180-seamless-hex-tiles
+  terrain/Terrain 1 - Flat - No Outline - 128x128.png
+
+Beliar83
+  shaders/*
+  icons/*
+    except tank.png 

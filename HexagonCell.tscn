@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://dajllsugna2y4"]
+
+[node name="Cell" type="Node2D"]
+
+[node name="Hexagon" type="Polygon2D" parent="."]
+scale = Vector2(4, 4)
+polygon = PackedVector2Array(-16, 0, -8, -16, 8, -16, 16, 0, 8, 16, -8, 16, -16, 0)
