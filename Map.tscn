@@ -1,43 +1,49 @@
-[gd_scene load_steps=23 format=4 uid="uid://cr8d0d08xcjbd"]
+[gd_scene load_steps=19 format=4 uid="uid://cr8d0d08xcjbd"]
 
-[ext_resource type="Script" uid="uid://bffuve5g1fujm" path="res://GameWorld.cs" id="1"]
-[ext_resource type="Script" uid="uid://dchjj12onryys" path="res://HexMap.cs" id="2"]
-[ext_resource type="Script" uid="uid://bu5jck5mlwm82" path="res://PlayerData.cs" id="2_fhlij"]
-[ext_resource type="Script" uid="uid://cl2lojsf3l174" path="res://MapUI.cs" id="3"]
+[ext_resource type="Script" uid="uid://dxurtaycpo0q8" path="res://player_data.gd" id="2_vm4q1"]
 [ext_resource type="PackedScene" uid="uid://cjiwmaboqhwen" path="res://Tank.tscn" id="4_on2sd"]
 [ext_resource type="PackedScene" uid="uid://dvp78rdoobjik" path="res://HexagonSelection.tscn" id="5_6f7pb"]
 [ext_resource type="Texture2D" uid="uid://fsf7x2hc3qoy" path="res://assets/terrain/Terrain 1 - Flat - No Outline - 128x128.png" id="5_e1peu"]
-[ext_resource type="Script" uid="uid://maapdaeb7gag" path="res://Components/Unit.cs" id="5_q8vtb"]
 [ext_resource type="PackedScene" uid="uid://dajllsugna2y4" path="res://HexagonCell.tscn" id="6_6f7pb"]
-[ext_resource type="Script" uid="uid://dicbbppiv04an" path="res://Components/Player.cs" id="9_ltliv"]
-[ext_resource type="Script" uid="uid://cw1wfn6ub3kmg" path="res://HexagonNode2D.cs" id="10_fhlij"]
-[ext_resource type="PackedScene" uid="uid://dljm44tcrl1x7" path="res://assets/Artillery.tscn" id="11_dbu0r"]
+[ext_resource type="Script" uid="uid://cm8hk85572ylu" path="res://map_ui.gd" id="7_0f2yp"]
+[ext_resource type="Script" uid="uid://fxosr5kdoooe" path="res://game_world.gd" id="11_bhm4d"]
+[ext_resource type="PackedScene" uid="uid://dljm44tcrl1x7" path="res://Artillery.tscn" id="11_dbu0r"]
 
-[sub_resource type="Resource" id="Resource_dbu0r"]
-script = ExtResource("2_fhlij")
-Name = "Player 1"
-Color = Color(0.909804, 0.12549, 0.141176, 1)
-metadata/_custom_type_script = "uid://bu5jck5mlwm82"
+[sub_resource type="Resource" id="Resource_ud676"]
+script = ExtResource("2_vm4q1")
+name = "Player 1"
+color = Color(5.583167e-06, 0, 0.98151773, 1)
+metadata/_custom_type_script = "uid://dxurtaycpo0q8"
 
-[sub_resource type="Resource" id="Resource_jrcb4"]
-script = ExtResource("2_fhlij")
-Name = "Player 2"
-Color = Color(0, 0.0666667, 0.827451, 1)
-metadata/_custom_type_script = "uid://bu5jck5mlwm82"
+[sub_resource type="Resource" id="Resource_6f7pb"]
+script = ExtResource("2_vm4q1")
+name = "Player 2"
+color = Color(0.69919544, 2.0816549e-06, 6.738305e-07, 1)
+metadata/_custom_type_script = "uid://dxurtaycpo0q8"
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_yg55q"]
 texture = ExtResource("5_e1peu")
 texture_region_size = Vector2i(128, 128)
 0:0/0 = 0
+0:0/0/custom_data_0 = true
 1:0/0 = 0
+1:0/0/custom_data_0 = true
 2:0/0 = 0
+2:0/0/custom_data_0 = true
 0:1/0 = 0
+0:1/0/custom_data_0 = true
 1:1/0 = 0
+1:1/0/custom_data_0 = true
 2:1/0 = 0
+2:1/0/custom_data_0 = true
 0:2/0 = 0
+0:2/0/custom_data_0 = true
 1:2/0 = 0
+1:2/0/custom_data_0 = true
 2:2/0 = 0
+2:2/0/custom_data_0 = true
 0:3/0 = 0
+0:3/0/custom_data_0 = true
 1:3/0 = 0
 2:3/0 = 0
 
@@ -46,6 +52,8 @@ tile_shape = 3
 tile_layout = 1
 tile_offset_axis = 1
 tile_size = Vector2i(128, 128)
+custom_data_layer_0/name = "traversable"
+custom_data_layer_0/type = 1
 sources/3 = SubResource("TileSetAtlasSource_yg55q")
 
 [sub_resource type="TileSetScenesCollectionSource" id="TileSetScenesCollectionSource_bhm4d"]
@@ -79,33 +87,34 @@ tile_size = Vector2i(128, 128)
 sources/0 = SubResource("TileSetScenesCollectionSource_6f7pb")
 
 [node name="Root" type="Node2D"]
+metadata/godot_composition_node_entities = Array[NodePath]([NodePath("GameWorld/Map/Tank"), NodePath("GameWorld/Map/Tank4"), NodePath("GameWorld/Map/Artillery"), NodePath("GameWorld/Map/Tank6"), NodePath("GameWorld/Map/Artillery2"), NodePath("GameWorld/Map/Tank2"), NodePath("GameWorld/Map/Tank3"), NodePath("GameWorld/Map/Tank5")])
 
 [node name="Camera2D" type="Camera2D" parent="."]
 
-[node name="GameWorld" type="Node2D" parent="." node_paths=PackedStringArray("MapUI", "Camera", "Map")]
+[node name="GameWorld" type="Node2D" parent="." node_paths=PackedStringArray("map_ui", "camera", "map")]
 z_index = 4096
 z_as_relative = false
 position = Vector2(-64, -128)
-script = ExtResource("1")
-MapUI = NodePath("../UILayer")
-Camera = NodePath("../Camera2D")
-Map = NodePath("Map")
-Players = Array[ExtResource("2_fhlij")]([SubResource("Resource_dbu0r"), SubResource("Resource_jrcb4")])
+script = ExtResource("11_bhm4d")
+players = Array[ExtResource("2_vm4q1")]([SubResource("Resource_ud676"), SubResource("Resource_6f7pb")])
+unit_mask = 1
+map_ui = NodePath("../UILayer")
+camera = NodePath("../Camera2D")
+map = NodePath("Map")
 
-[node name="Map" type="TileMapLayer" parent="GameWorld" node_paths=PackedStringArray("HoverLayer", "SelectionLayer", "AttackableLayer", "AttackRangeLayer", "RemainingMovementLayer", "MovementRangeLayer")]
+[node name="Map" type="HexMap" parent="GameWorld" node_paths=PackedStringArray("hover_layer", "selection_layer", "attackable_layer", "remaining_movement_layer", "movement_range_layer", "attackable_range_layer")]
+hover_layer = NodePath("HoverLayer")
+selection_layer = NodePath("SelectionLayer")
+attackable_layer = NodePath("AttackableLayer")
+remaining_movement_layer = NodePath("RemainingMovementLayer")
+movement_range_layer = NodePath("MovementRangeLayer")
+attackable_range_layer = NodePath("AttackRangeLayer")
 z_index = 1
 z_as_relative = false
 texture_filter = 3
 use_parent_material = true
 tile_map_data = PackedByteArray("AAAAAAAAAwACAAAAAAD//wAAAwACAAAAAAAAAP//AwACAAAAAAABAAAAAwACAAAAAAABAAEAAwACAAAAAAAAAAEAAwACAAAAAAD//wEAAwACAAAAAAD+/wAAAwACAAAAAAD/////AwACAAAAAAAAAP7/AwACAAAAAAABAP//AwACAAAAAAACAP//AwACAAAAAAD+////AwACAAAAAAD+/wEAAwACAAAAAAD//wIAAwACAAAAAAAAAAIAAwACAAAAAAABAAIAAwACAAAAAAACAAEAAwACAAAAAAACAAAAAwACAAAAAAD//wMAAwACAAAAAAD+/wIAAwACAAAAAAD9/wIAAwACAAAAAAD9/wEAAwACAAAAAAD9/wAAAwACAAAAAAD9////AwACAAEAAAD+//7/AwACAAAAAAD///7/AwACAAEAAAAAAP3/AwACAAEAAAABAP7/AwACAAAAAAACAP7/AwACAAAAAAADAP//AwACAAAAAAADAAAAAwACAAEAAAADAAEAAwACAAEAAAADAAIAAwACAAEAAAACAAIAAwACAAAAAAABAAMAAwACAAAAAAAAAAMAAwACAAAAAAD8/wEAAwACAAEAAAD8/wAAAwACAAEAAAD8////AwACAAEAAAD8//7/AwACAAEAAAD9//7/AwACAAEAAAD+//3/AwACAAEAAAD///3/AwACAAEAAAAAAPz/AwACAAEAAAABAP3/AwACAAEAAAACAP3/AwACAAEAAAADAP7/AwACAAEAAAAEAP7/AwACAAEAAAAEAP//AwACAAEAAAAEAAAAAwACAAEAAAAEAAEAAwACAAEAAAAEAAIAAwACAAEAAAADAAMAAwACAAEAAAACAAMAAwACAAEAAAABAAQAAwACAAEAAAAAAAQAAwACAAEAAAD//wQAAwACAAEAAAD+/wMAAwACAAEAAAD9/wMAAwACAAEAAAD8/wIAAwACAAEAAAAEAAMAAwACAAEAAAADAAQAAwACAAEAAAACAAQAAwACAAEAAAABAAUAAwACAAEAAAAAAAUAAwACAAEAAAD//wUAAwACAAEAAAD+/wQAAwACAAEAAAD9/wQAAwACAAEAAAD8/wMAAwACAAEAAAD7/wMAAwACAAEAAAD7/wIAAwACAAEAAAD7/wEAAwACAAEAAAD7/wAAAwACAAEAAAD7////AwACAAEAAAD7//7/AwACAAEAAAD8//3/AwACAAEAAAD9//3/AwACAAEAAAD+//z/AwACAAEAAAD8//z/AwACAAEAAAD7//3/AwACAAEAAAD7/wQAAwACAAEAAAD8/wQAAwACAAEAAAD9/wUAAwACAAEAAAACAAUAAwACAAEAAAADAAUAAwACAAEAAAAEAAUAAwACAAEAAAAEAAQAAwACAAEAAAACAPz/AwACAAEAAAADAP3/AwACAAEAAAAEAP3/AwACAAEAAAAFAP7/AwACAAEAAAAFAP//AwACAAEAAAAFAAAAAwACAAEAAAAFAAEAAwACAAEAAAAFAAIAAwACAAEAAAAFAAMAAwACAAEAAAAFAAQAAwACAAEAAAAFAAUAAwACAAEAAAAFAP3/AwACAAEAAAD6//z/AwACAAMAAAD7//z/AwACAAMAAAD8//v/AwACAAMAAAD9//z/AwACAAMAAAD+//v/AwACAAMAAAD///z/AwACAAMAAAAAAPv/AwACAAMAAAABAPz/AwACAAMAAAACAPv/AwACAAMAAAADAPz/AwACAAMAAAAEAPz/AwACAAMAAAAFAPz/AwACAAMAAAAGAPz/AwACAAMAAAAGAP3/AwACAAMAAAAGAP7/AwACAAMAAAAGAP//AwACAAMAAAAHAAAAAwACAAMAAAAGAAAAAwACAAMAAAAHAAEAAwACAAMAAAAGAAEAAwACAAMAAAAHAAIAAwACAAMAAAAGAAIAAwACAAMAAAAGAAMAAwACAAMAAAAGAAQAAwACAAMAAAAGAAUAAwACAAMAAAAFAAYAAwACAAMAAAAEAAYAAwACAAMAAAADAAYAAwACAAMAAAACAAYAAwACAAMAAAABAAYAAwACAAMAAAAAAAYAAwACAAMAAAD//wYAAwACAAMAAAD+/wYAAwACAAMAAAD+/wUAAwACAAMAAAD9/wYAAwACAAMAAAD8/wUAAwACAAMAAAD7/wUAAwACAAMAAAD6/wQAAwACAAMAAAD6/wMAAwACAAMAAAD5/wMAAwACAAMAAAD6/wIAAwACAAMAAAD5/wIAAwACAAMAAAD6/wEAAwACAAMAAAD6/wAAAwACAAMAAAD6////AwACAAMAAAD6//7/AwACAAMAAAD6//3/AwACAAMAAAA=")
 tile_set = SubResource("TileSet_onen7")
-script = ExtResource("2")
-HoverLayer = NodePath("HoverLayer")
-SelectionLayer = NodePath("SelectionLayer")
-AttackableLayer = NodePath("AttackableLayer")
-AttackRangeLayer = NodePath("AttackRangeLayer")
-RemainingMovementLayer = NodePath("RemainingMovementLayer")
-MovementRangeLayer = NodePath("MovementRangeLayer")
 
 [node name="HoverLayer" type="TileMapLayer" parent="GameWorld/Map"]
 texture_filter = 3
@@ -135,110 +144,268 @@ modulate = Color(0, 0.251, 1, 0.25)
 texture_filter = 3
 tile_set = SubResource("TileSet_jrcb4")
 
+[node name="Tank6" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
+H_Q = 1
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(5.583167e-06, 0, 0.98151773, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 3,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 0
+}
+}])
+
 [node name="Tank" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
-
-[node name="Unit" type="Node" parent="GameWorld/Map/Tank" node_paths=PackedStringArray("Body", "Weapon", "IntegrityLabel")]
-script = ExtResource("5_q8vtb")
-Integrity = 10
-Damage = 1
-MaxAttackRange = 3
-MinAttackRange = 1
-Mobility = 4
-RemainingRange = 4
-RemainingAttacks = 1
-Color = Color(0, 0, 1, 1)
-Body = NodePath("../Tank/Body")
-Weapon = NodePath("../Tank/Body/Weapon")
-IntegrityLabel = NodePath("../Tank/Integrity")
-
-[node name="Player2" type="Node" parent="GameWorld/Map/Tank"]
-script = ExtResource("9_ltliv")
-PlayerId = &"Player 2"
+H_Q = 1
+H_R = -1
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(5.583167e-06, 0, 0.98151773, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 3,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}])
 
 [node name="Tank2" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
-Q = 1
-R = -1
+H_Q = -2
+H_R = 1
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(0.69919544, 2.0816549e-06, 6.738305e-07, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 0,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 1
+}
+}])
 
-[node name="Unit" type="Node" parent="GameWorld/Map/Tank2" node_paths=PackedStringArray("Body", "Weapon", "IntegrityLabel")]
-script = ExtResource("5_q8vtb")
-Integrity = 10
-Damage = 1
-MaxAttackRange = 3
-MinAttackRange = 1
-Mobility = 4
-RemainingRange = 4
-RemainingAttacks = 1
-Color = Color(0.705882, 0, 0, 1)
-Body = NodePath("../Tank/Body")
-Weapon = NodePath("../Tank/Body/Weapon")
-IntegrityLabel = NodePath("../Tank/Integrity")
+[node name="Artillery2" parent="GameWorld/Map" instance=ExtResource("11_dbu0r")]
+H_Q = -4
+H_R = 2
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(0.69919544, 2.0816549e-06, 6.738305e-07, 1),
+&"damage": 5,
+&"indirect_weapon_angle_degrees": 40.0,
+&"integrity": 5,
+&"is_attack_indirect": true,
+&"max_attack_range": 3,
+&"min_attack_range": 2,
+&"mobility": 1,
+&"remaining_attacks": 1,
+&"remaining_range": 1,
+&"sync_color_with_player": true,
+&"weapon_direction": 1
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 1
+}
+}])
 
-[node name="Player" type="Node" parent="GameWorld/Map/Tank2"]
-script = ExtResource("9_ltliv")
-PlayerId = &"Player 1"
-
-[node name="Artillery" type="Node2D" parent="GameWorld/Map"]
-script = ExtResource("10_fhlij")
-Q = -3
-R = 3
-metadata/_custom_type_script = "uid://cw1wfn6ub3kmg"
-
-[node name="Artillery" parent="GameWorld/Map/Artillery" instance=ExtResource("11_dbu0r")]
-
-[node name="Player" type="Node" parent="GameWorld/Map/Artillery"]
-script = ExtResource("9_ltliv")
-PlayerId = &"Player 1"
-metadata/_custom_type_script = "uid://dicbbppiv04an"
-
-[node name="Unit" type="Node" parent="GameWorld/Map/Artillery" node_paths=PackedStringArray("Body", "IntegrityLabel")]
-script = ExtResource("5_q8vtb")
-Integrity = 5
-Damage = 2
-MaxAttackRange = 5
-MinAttackRange = 3
-RemainingAttacks = 1
-IsAttackIndirect = true
-BodyDirection = 0
-Color = Color(0.705882, 0, 0, 1)
-IndirectWeaponAngleDegrees = 30.0
-Body = NodePath("../Artillery/Body/Weapon")
-IntegrityLabel = NodePath("../Artillery/Integrity")
-metadata/_custom_type_script = "uid://maapdaeb7gag"
+[node name="Artillery" parent="GameWorld/Map" instance=ExtResource("11_dbu0r")]
+H_Q = -4
+H_R = 3
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 1
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(0.69919544, 2.0816549e-06, 6.738305e-07, 1),
+&"damage": 5,
+&"indirect_weapon_angle_degrees": 40.0,
+&"integrity": 5,
+&"is_attack_indirect": true,
+&"max_attack_range": 3,
+&"min_attack_range": 2,
+&"mobility": 1,
+&"remaining_attacks": 1,
+&"remaining_range": 1,
+&"sync_color_with_player": true,
+&"weapon_direction": 1
+}
+}])
 
 [node name="Tank3" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
-Q = -1
-R = -1
-S = 2
+H_R = -1
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(5.583167e-06, 0, 0.98151773, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 3,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 0
+}
+}])
 
-[node name="Unit" type="Node" parent="GameWorld/Map/Tank3" node_paths=PackedStringArray("Body", "Weapon", "IntegrityLabel")]
-script = ExtResource("5_q8vtb")
-Integrity = 4
-Damage = 1
-MaxAttackRange = 3
-Mobility = 3
-RemainingRange = 3
-RemainingAttacks = 1
-BodyDirection = 4
-WeaponDirection = 4
-Color = Color(0, 0, 1, 1)
-Body = NodePath("../Tank/Body")
-Weapon = NodePath("../Tank/Body/Weapon")
-IntegrityLabel = NodePath("../Tank/Integrity")
-metadata/_custom_type_script = "uid://maapdaeb7gag"
+[node name="Tank4" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
+H_Q = 1
+H_R = 1
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(5.583167e-06, 0, 0.98151773, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 3,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 0
+}
+}])
 
-[node name="Player" type="Node" parent="GameWorld/Map/Tank3"]
-script = ExtResource("9_ltliv")
-PlayerId = &"Player 2"
-metadata/_custom_type_script = "uid://dicbbppiv04an"
+[node name="Tank5" parent="GameWorld/Map" instance=ExtResource("4_on2sd")]
+H_Q = -2
+H_R = 2
+metadata/godot_composition_components = Array[Dictionary]([{
+"base_class": &"Component",
+&"component_class": &"Unit",
+"script": "res://Components/unit.gd",
+"values": {
+&"armor": 0,
+&"body_direction": 0,
+&"color": Color(0.69919544, 2.0816549e-06, 6.738305e-07, 1),
+&"damage": 1,
+&"indirect_weapon_angle_degrees": 0.0,
+&"integrity": 10,
+&"is_attack_indirect": false,
+&"max_attack_range": 4,
+&"min_attack_range": 1,
+&"mobility": 3,
+&"remaining_attacks": 1,
+&"remaining_range": 0,
+&"sync_color_with_player": true,
+&"weapon_direction": 0
+}
+}, {
+"base_class": &"Component",
+&"component_class": &"Player",
+"script": "res://Components/player.gd",
+"values": {
+&"player_id": 1
+}
+}])
 
-[node name="UILayer" type="CanvasLayer" parent="." node_paths=PackedStringArray("PlayerLabel", "GameWorld", "Camera")]
-script = ExtResource("3")
-PlayerLabel = NodePath("UI/Top/PlayerName")
-GameWorld = NodePath("../GameWorld")
-Camera = NodePath("../Camera2D")
+[node name="UILayer" type="CanvasLayer" parent="." node_paths=PackedStringArray("player_label", "game_world", "camera")]
+script = ExtResource("7_0f2yp")
+player_label = NodePath("UI/Top/PlayerName")
+game_world = NodePath("../GameWorld")
+camera = NodePath("../Camera2D")
 
 [node name="UI" type="MarginContainer" parent="UILayer"]
-anchors_preset = 15
+anchors_preset = -1
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_right = 768.0
@@ -252,11 +419,11 @@ mouse_filter = 2
 
 [node name="PlayerName" type="Label" parent="UILayer/UI/Top"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.909804, 0.12549, 0.141176, 1)
+theme_override_colors/font_color = Color(1, 0, 0, 1)
 theme_override_colors/font_outline_color = Color(0.498039, 0.498039, 0.498039, 1)
 theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 30
-text = "Player 1"
+text = "Player1"
 
 [node name="Bottom" type="VBoxContainer" parent="UILayer/UI"]
 layout_mode = 2

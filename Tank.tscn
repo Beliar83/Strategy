@@ -1,6 +1,6 @@
 [gd_scene load_steps=10 format=3 uid="uid://cjiwmaboqhwen"]
 
-[ext_resource type="Script" uid="uid://cw1wfn6ub3kmg" path="res://HexagonNode2D.cs" id="1_r7dwq"]
+[ext_resource type="Script" uid="uid://b1gq762eui18x" path="res://unit.gd" id="1_b420v"]
 [ext_resource type="Texture2D" uid="uid://cd7ehp51ov07a" path="res://assets/units/Body01_Mask.png" id="3_43llf"]
 [ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="3_b1r4v"]
 [ext_resource type="Texture2D" uid="uid://5xmbook1nu6" path="res://assets/units/Body01.png" id="4_rnu2w"]
@@ -11,7 +11,7 @@
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_lyk2d"]
 resource_local_to_scene = true
 shader = ExtResource("6_tatij")
-shader_parameter/color = Color(1, 1, 1, 0)
+shader_parameter/color = Color(1, 1, 1, 1)
 shader_parameter/mask = ExtResource("3_43llf")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_f6o17"]
@@ -20,42 +20,42 @@ shader = ExtResource("6_tatij")
 shader_parameter/color = Color(1, 1, 1, 1)
 shader_parameter/mask = ExtResource("6_v7d6c")
 
-[node name="Tank" type="Node2D"]
-script = ExtResource("1_r7dwq")
-TileMapLocalPositionAdjusted = null
+[node name="Tank" type="HexagonNode2D" node_paths=PackedStringArray("body", "weapon", "integrity_label")]
+script = ExtResource("1_b420v")
+body = NodePath("Body")
+weapon = NodePath("Body/Weapon")
+integrity_label = NodePath("Integrity")
+metadata/godot_composition_node_entities = Array[NodePath]([])
 
-[node name="Tank" type="Area2D" parent="."]
-collision_layer = 2
-
-[node name="Body" type="Sprite2D" parent="Tank"]
+[node name="Body" type="Sprite2D" parent="."]
 z_index = 1
 material = SubResource("ShaderMaterial_lyk2d")
 position = Vector2(0, -1.5)
 scale = Vector2(0.25, 0.25)
 texture = ExtResource("4_rnu2w")
 
-[node name="Weapon" type="Sprite2D" parent="Tank/Body"]
+[node name="Weapon" type="Sprite2D" parent="Body"]
 z_index = 1
 material = SubResource("ShaderMaterial_f6o17")
 position = Vector2(-5, -2)
 texture = ExtResource("7_s68id")
 offset = Vector2(5, -85)
 
-[node name="LeftTracks" type="Sprite2D" parent="Tank/Body"]
+[node name="LeftTracks" type="Sprite2D" parent="Body"]
 z_index = 1
 position = Vector2(-75, 5)
 
-[node name="RightTracks" type="Sprite2D" parent="Tank/Body"]
+[node name="RightTracks" type="Sprite2D" parent="Body"]
 z_index = 1
 position = Vector2(75, 5)
 
-[node name="Outline" type="Line2D" parent="Tank"]
+[node name="Outline" type="Line2D" parent="."]
 points = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20, -20, -20)
 width = 2.0
 default_color = Color(0, 0, 0, 1)
 begin_cap_mode = 1
 
-[node name="Integrity" type="Label" parent="Tank"]
+[node name="Integrity" type="Label" parent="."]
 z_index = 3
 offset_left = -19.0
 offset_top = -12.0
@@ -66,5 +66,6 @@ horizontal_alignment = 1
 clip_text = true
 max_lines_visible = 1
 
-[node name="CollisionPolygon2D" parent="Tank" instance=ExtResource("3_b1r4v")]
+[node name="CollisionPolygon2D" parent="." instance=ExtResource("3_b1r4v")]
+visible = false
 polygon = PackedVector2Array(-6, -12, 6, -12, 12, 0, 6, 12, -6, 12, -12, 0, -12, 0)

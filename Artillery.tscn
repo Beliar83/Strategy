@@ -1,0 +1,52 @@
+[gd_scene load_steps=7 format=3 uid="uid://dljm44tcrl1x7"]
+
+[ext_resource type="Script" uid="uid://b1gq762eui18x" path="res://unit.gd" id="1_lugil"]
+[ext_resource type="Shader" uid="uid://8fdbnli02xo4" path="res://assets/shaders/unit_colorizer.gdshader" id="2_n17db"]
+[ext_resource type="Texture2D" uid="uid://87puf662biht" path="res://assets/units/Artillery_Gun_01_Mask.png" id="4_7cr5g"]
+[ext_resource type="Texture2D" uid="uid://dcw4hstr5mavb" path="res://assets/units/Artillery_Gun_01.png" id="5_tbwwf"]
+[ext_resource type="PackedScene" uid="uid://l7ir0l16shb7" path="res://HexagonCollider.tscn" id="9_18dic"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_l1lr5"]
+resource_local_to_scene = true
+shader = ExtResource("2_n17db")
+shader_parameter/color = Color(1, 1, 1, 1)
+shader_parameter/mask = ExtResource("4_7cr5g")
+
+[node name="Artillery" type="HexagonNode2D" node_paths=PackedStringArray("weapon", "integrity_label")]
+script = ExtResource("1_lugil")
+weapon = NodePath("Body/Weapon")
+integrity_label = NodePath("Integrity")
+metadata/godot_composition_node_entities = Array[NodePath]([])
+
+[node name="Outline" type="Line2D" parent="."]
+visible = false
+points = PackedVector2Array(-20, -20, 20, -20, 20, 20, -20, 20, -20, -20)
+width = 2.0
+default_color = Color(0, 0, 0, 1)
+begin_cap_mode = 1
+
+[node name="Integrity" type="Label" parent="."]
+z_index = 3
+offset_left = -19.0
+offset_top = -12.0
+offset_right = 20.0
+offset_bottom = 11.0
+text = "999"
+horizontal_alignment = 1
+clip_text = true
+max_lines_visible = 1
+
+[node name="Body" type="Node2D" parent="."]
+
+[node name="Weapon" type="Sprite2D" parent="Body"]
+z_index = 2
+z_as_relative = false
+material = SubResource("ShaderMaterial_l1lr5")
+position = Vector2(0, -1)
+scale = Vector2(0.125, 0.125)
+texture = ExtResource("5_tbwwf")
+offset = Vector2(1, -5)
+
+[node name="CollisionPolygon2D" parent="." instance=ExtResource("9_18dic")]
+visible = false
+polygon = PackedVector2Array(-6, -12, 6, -12, 12, 0, 6, 12, -6, 12, -12, 0, -12, 0)

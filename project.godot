@@ -12,21 +12,21 @@ config_version=5
 
 config/name="Strategy"
 run/main_scene="uid://cr8d0d08xcjbd"
-config/features=PackedStringArray("4.4", "C#", "GL Compatibility")
+config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+HexNavi="*res://addons/hex_grid_nav/hexagon_navigation.gd"
 
 [display]
 
 window/size/viewport_width=640
 window/size/viewport_height=480
 
-[dotnet]
-
-project/assembly_name="Strategy"
-
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/RadialMenu/plugin.cfg")
+enabled=PackedStringArray("res://addons/RadialMenu/plugin.cfg", "res://addons/godot_composition_gd/plugin.cfg", "res://addons/hex_grid_nav/plugin.cfg")
 
 [input]
 
